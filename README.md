@@ -1,49 +1,55 @@
-# JSON Schema to UI Compiler
+# JSON Schema Form Generator
 
-A framework-agnostic JavaScript library that converts standard JSON Schema (draft 2020-12) into a UI definition, specifically targeting `jsonform` compatibility.
+This project is a web-based application that dynamically generates HTML forms from a given JSON Schema. It's built using Vite for a fast development experience and uses TypeScript for type safety.
 
-## Architecture
+## Features
 
-This project implements a compiler-style pipeline to transform data schemas into form definitions:
+-   **Dynamic Form Generation**: Automatically creates HTML forms based on JSON Schema definitions.
+-   **Schema Dereferencing**: Resolves `$ref` pointers within your JSON Schema using `@apidevtools/json-schema-ref-parser`.
+-   **Type-Safe Development**: Written in TypeScript for robust and maintainable code.
+-   **Modern Tooling**: Utilizes Vite for development and bundling, providing a fast and efficient workflow.
 
-1.  **Normalization (`src/normalizer.js`)**:
-    -   Takes raw JSON Schema.
-    -   Resolves all `$ref` pointers using `@apidevtools/json-schema-ref-parser`.
-    -   Produces a "Schema IR" (Intermediate Representation).
+## How it Works
 
-2.  **Compilation (`src/compiler.js`)**:
-    -   Traverses the Schema IR.
-    -   Applies declarative rules from `rules.json`.
-    -   Produces a "UI IR" (a generic, widget-oriented tree).
+The application follows a clear pipeline to transform a JSON Schema into an interactive form:
 
-3.  **Emission (`src/emitter.js`)**:
-    -   Takes the UI IR.
-    -   Generates a specific configuration object for `jsonform`.
+1.  **Schema Loading**: The `index.html` file (located in the project root) is the entry point. It loads the main application script (`src/index.ts`).
+2.  **Schema Fetching & Parsing**: The `src/index.ts` script fetches the `schema.json` file. It then uses `src/parser.ts` to parse this schema.
+3.  **Schema Dereferencing and Transformation**: `src/parser.ts` utilizes the `@apidevtools/json-schema-ref-parser` library to dereference any `$ref` pointers in the JSON Schema. It then transforms the raw JSON Schema into a simplified, UI-friendly `FormNode` tree structure.
+4.  **Form Rendering**: `src/index.ts` passes the `FormNode` tree to `src/renderer.ts`, which is responsible for generating and injecting the corresponding HTML form elements into the DOM.
+5.  **Live JSON Output**: As the user interacts with the generated form, the application dynamically updates a live JSON output, reflecting the current state of the form data.
 
 ## Project Structure
 
 ```text
 .
-├── package.json
-├── rules.json        # Declarative mapping rules (Schema Type -> Widget Type)
-└── src
-    ├── compiler.js   # Rule engine and UI IR generation
-    ├── emitter.js    # Output generator (jsonform)
-    ├── index.js      # Entry point / Example usage
-    ├── normalizer.js # Schema dereferencing
-    └── types.js      # JSDoc type definitions
+├── index.html            # Main HTML entry point
+├── package.json          # Project dependencies and scripts
+├── schema.json           # Example JSON Schema
+├── tsconfig.json         # TypeScript configuration
+├── vite.config.ts        # Vite configuration (including polyfills for Node.js modules)
+├── public/               # Static assets (e.g., schema.json will be moved here if needed)
+│   └── (optional: schema.json) # schema.json is served from here
+└── src/
+    ├── index.ts          # Main application logic, orchestrates parsing and rendering
+    ├── parser.ts         # Parses JSON Schema, dereferences, and transforms to FormNode tree
+    └── renderer.ts       # Renders the FormNode tree into HTML form elements
 ```
 
-## Installation
+## Setup
 
-```bash
-npm install
-```
+1.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+2.  **Development Server**:
+    To start the development server and view the application in your browser:
+    ```bash
+    npm run dev
+    ```
+    The application will typically be available at `http://localhost:5173/` (or a similar port if 5173 is in use).
 
-## Usage
+## Troubleshooting
 
-Run the example transformation defined in `src/index.js`:
-
-```bash
-npm start
-```
+-   **"Buffer is not defined" or "Module 'path' has been externalized" errors**: This project uses Node.js polyfills via `vite-plugin-node-polyfills` to make `@apidevtools/json-schema-ref-parser` compatible with browser environments. Ensure this plugin is correctly configured in `vite.config.ts` and `buffer` and `path` are included in its `include` option.
+-   **404 errors for `index.html`**: Ensure `index.html` is located in the root of your project directory.

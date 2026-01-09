@@ -2,10 +2,9 @@
   "name": "json-schema-mapper",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
+    "dev": "vite",
+    "build": "vite build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -18,9 +17,15 @@
   "keywords": [],
   "author": "",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "bugs": {
     "url": "https://github.com/marcomq/json-schema-mapper/issues"
   },
-  "homepage": "https://github.com/marcomq/json-schema-mapper#readme"
+  "homepage": "https://github.com/marcomq/json-schema-mapper#readme",
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4",
+    "vite-plugin-node-polyfills": "^0.24.0"
+  }
 }

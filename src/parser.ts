@@ -29,23 +29,19 @@ export async function parseSchema(schema: JSONSchema | string): Promise<FormNode
     const parser = new $RefParser();
     // Parse first to get the raw structure and check for root $ref
     const parsedSchema = (await parser.parse(schema as any)) as JSONSchema;
-    console.log(parsedSchema);
+    console.log(parsedSchema); // TODO
 
     const rootRef = typeof parsedSchema === "object" ? (parsedSchema as Exclude<JSONSchema, boolean>).$ref : undefined;
     const rootAdditionalPropertiesRef =
       typeof parsedSchema === "object" && parsedSchema.additionalProperties && typeof parsedSchema.additionalProperties === "object" && "$ref" in parsedSchema.additionalProperties
         ? (parsedSchema.additionalProperties as { $ref: string }).$ref
         : undefined;
-
-    console.log("a");
     // Dereference the schema to resolve all $ref pointers
     const dereferencedSchema = (await parser.dereference(schema as any)) as JSONSchema;
-    console.log("b");
     let finalSchema = dereferencedSchema;
 
     // If the root schema had a $ref, resolve it manually from the dereferenced definitions
     if (rootRef && rootRef.startsWith("#/") && typeof finalSchema === "object") {
-      console.log(1);
       const refPath = rootRef.substring(2).split("/");
       let definition: any = dereferencedSchema;
       for (const part of refPath) {
@@ -58,7 +54,6 @@ export async function parseSchema(schema: JSONSchema | string): Promise<FormNode
 
     // If the root schema had a $ref in additionalProperties, resolve it manually
     if (rootAdditionalPropertiesRef && rootAdditionalPropertiesRef.startsWith("#/") && typeof finalSchema === "object") {
-      console.log(2);
       const refPath = rootAdditionalPropertiesRef.substring(2).split("/");
       let definition: any = dereferencedSchema;
       for (const part of refPath) {
@@ -72,7 +67,7 @@ export async function parseSchema(schema: JSONSchema | string): Promise<FormNode
     }
 
     // Transform the raw schema into our simplified FormNode tree
-    console.log("dereferencedSchema:", finalSchema);
+    console.log("dereferencedSchema:", finalSchema); // TODO
     return transformSchemaToFormNode(finalSchema);
   } catch (err) {
     console.error("Error parsing schema:", err);

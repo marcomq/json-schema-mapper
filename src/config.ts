@@ -1,4 +1,4 @@
-export const CONFIG = {
+export const DEFAULT_CONFIG = {
   sorting: {
     defaultPriority: [
       'name', 'id', 'title', 'type', 'enabled', 'active', 'url', 'brokers',
@@ -16,3 +16,17 @@ export const CONFIG = {
     ]
   }
 };
+
+export let CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+
+export function setConfig(config: Partial<typeof DEFAULT_CONFIG>) {
+  if (config.sorting) {
+    CONFIG.sorting = { ...CONFIG.sorting, ...config.sorting };
+  }
+  if (config.visibility) {
+    CONFIG.visibility = { ...CONFIG.visibility, ...config.visibility };
+  }
+  if (config.parser) {
+    CONFIG.parser = { ...CONFIG.parser, ...config.parser };
+  }
+}

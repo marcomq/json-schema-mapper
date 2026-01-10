@@ -5,30 +5,23 @@ import { CONFIG } from "./config";
 // Registry to store nodes for dynamic rendering (Arrays, OneOf)
 const NODE_REGISTRY = new Map<string, FormNode>();
 
+export interface CustomRenderer {
+  render?: (node: FormNode, path: string, elementId: string) => string;
+  widget?: string;
+  options?: string[];
+}
+
 // Configuration for specific fields
-const UI_CONFIG: Record<string, any> = {
-  "tls": {
-    render: (node: FormNode, path: string, elementId: string) => {
-      const requiredProp = node.properties?.["required"];
-      if (!requiredProp) return renderObject(node, path, elementId);
-
-      const otherProps = { ...node.properties };
-      delete otherProps["required"];
-      
-      const requiredId = `${elementId}.required`;
-      // Checkbox controls visibility of the options container
-      const checkbox = templates.renderBoolean(requiredProp, requiredId, `data-toggle-target="${elementId}-options"`);
-      
-      const optionsHtml = renderProperties(otherProps, elementId);
-
-      return templates.renderTlsGroup(node, elementId, checkbox, optionsHtml);
-    }
-  },
+let customRenderers: Record<string, CustomRenderer> = {
   "consumer mode": {
     widget: "select",
     options: ["consumer", "subscriber"]
   }
 };
+
+export function setCustomRenderers(renderers: Record<string, CustomRenderer>) {
+  customRenderers = { ...customRenderers, ...renderers };
+}
 
 /**
  * Renders a form into the container based on the parsed schema tree.
@@ -42,7 +35,7 @@ export function renderForm(rootNode: FormNode, formContainer: HTMLElement) {
   attachInteractivity(formContainer);
 }
 
-function renderNode(node: FormNode, path: string = "", headless: boolean = false): string {
+export function renderNode(node: FormNode, path: string = "", headless: boolean = false): string {
   if (node.description?.includes("Consumer only")) {
     return "";
   }
@@ -58,13 +51,20 @@ function renderNode(node: FormNode, path: string = "", headless: boolean = false
 
   // 1. Custom Renderers
   const configKey = node.title.toLowerCase();
-  if (UI_CONFIG[configKey]?.render) {
-    return UI_CONFIG[configKey].render(node, path, elementId);
+  const fullPathKey = elementId.toLowerCase();
+  const renderer = customRenderers[fullPathKey] || customRenderers[configKey];
+
+  if (renderer?.render) {
+    return renderer.render(node, path, elementId);
   }
 
   // 2. Widget Overrides
-  if (UI_CONFIG[configKey]?.widget === 'select') {
-    return templates.renderSelect(node, elementId, UI_CONFIG[configKey].options);
+  if (renderer?.widget === 'select') {
+    return templates.renderSelect(node, elementId, renderer.options);
+  }
+
+  if (node.enum) {
+    return templates.renderSelect(node, elementId, node.enum.map(String));
   }
 
   // 3. Standard Types
@@ -80,7 +80,7 @@ function renderNode(node: FormNode, path: string = "", headless: boolean = false
   }
 }
 
-function renderObject(node: FormNode, _path: string, elementId: string, headless: boolean = false): string {
+export function renderObject(node: FormNode, _path: string, elementId: string, headless: boolean = false): string {
   const props = node.properties ? renderProperties(node.properties, elementId) : '';
   const ap = templates.renderAdditionalProperties(node, elementId);
   const oneOf = templates.renderOneOf(node, elementId);
@@ -90,7 +90,7 @@ function renderObject(node: FormNode, _path: string, elementId: string, headless
   return templates.renderObject(node, elementId, props + ap + oneOf);
 }
 
-function renderProperties(properties: { [key: string]: FormNode }, parentId: string): string {
+export function renderProperties(properties: { [key: string]: FormNode }, parentId: string): string {
   const keys = Object.keys(properties).sort((a, b) => {
     const nodeA = properties[a];
     const nodeB = properties[b];

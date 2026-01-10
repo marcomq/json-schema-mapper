@@ -16,6 +16,7 @@ export interface FormNode {
   items?: FormNode; // For arrays
   additionalProperties?: boolean | FormNode;
   oneOf?: FormNode[];
+  enum?: any[];
   // ... other properties we might need for rendering
 }
 
@@ -111,7 +112,7 @@ export function transformSchemaToFormNode(
   let type = schemaObj.type;
   if (!type) {
     // Infer type if missing
-    if (schemaObj.properties || schemaObj.additionalProperties || schemaObj.oneOf) {
+    if (schemaObj.properties || schemaObj.additionalProperties || schemaObj.oneOf || schemaObj.anyOf) {
       type = "object";
     } else {
       type = Array.isArray(schemaObj.type) ? schemaObj.type[0] : "string";
@@ -125,11 +126,13 @@ export function transformSchemaToFormNode(
     title: getKeyText(title, schemaObj.title || formatTitle(title)),
     description: getDescriptionText(title, schemaObj.description || undefined),
     defaultValue: schemaObj.default,
+    enum: schemaObj.enum as any[],
   };
 
   // Handle oneOf
-  if (schemaObj.oneOf) {
-    node.oneOf = schemaObj.oneOf.map((sub: JSONSchema, idx: number) => {
+  const selection = schemaObj.oneOf || schemaObj.anyOf;
+  if (selection) {
+    node.oneOf = selection.map((sub: JSONSchema, idx: number) => {
       const mergedSub = mergeAllOf(sub);
       return transformSchemaToFormNode(mergedSub, inferTitle(mergedSub, idx), depth + 1);
     });
@@ -254,6 +257,9 @@ function mergeAllOf(schema: JSONSchema): JSONSchema {
     }
     if (flattenedSub.oneOf) {
       merged.oneOf = flattenedSub.oneOf;
+    }
+    if (flattenedSub.anyOf) {
+      merged.anyOf = flattenedSub.anyOf;
     }
   });
 

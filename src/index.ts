@@ -1,6 +1,12 @@
 import { FormNode, parseSchema } from "./parser";
-import { renderForm } from "./renderer";
+import { renderForm, renderNode, setCustomRenderers } from "./renderer";
 import * as templates from "./templates";
+import { CUSTOM_RENDERERS } from "./custom-renderers";
+
+export { setConfig } from "./config";
+export { setI18n } from "./i18n";
+export { setTemplates } from "./templates";
+export { setCustomRenderers, renderNode } from "./renderer";
 
 function readFormData(node: FormNode, path: string = ""): any {
   const elementId = path ? `${path}.${node.title}` : node.title;
@@ -82,7 +88,7 @@ function readFormData(node: FormNode, path: string = ""): any {
 
     case "string":
     default:
-      const strElement = document.getElementById(elementId) as HTMLInputElement | null;
+      const strElement = document.getElementById(elementId) as HTMLInputElement | HTMLSelectElement | null;
       return strElement ? strElement.value : "";
   }
 }
@@ -99,6 +105,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     const rootNode = await parseSchema("/schema.json");
     console.log("Parsed schema:", rootNode);
+
+    // Register custom renderer for TLS to restore the toggle functionality
+    setCustomRenderers(CUSTOM_RENDERERS);
+
     renderForm(rootNode, formContainer);
 
     const updateJson = () => {

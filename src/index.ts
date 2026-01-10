@@ -6,12 +6,67 @@ function readFormData(node: FormNode, path: string = ""): any {
 
   switch (node.type) {
     case "object":
-      if (!node.properties) return {};
       const obj: { [key: string]: any } = {};
-      for (const key in node.properties) {
-        obj[key] = readFormData(node.properties[key], elementId);
+      
+      // Read defined properties
+      if (node.properties) {
+        for (const key in node.properties) {
+          obj[key] = readFormData(node.properties[key], elementId);
+        }
       }
+
+      // Read additional properties
+      if (node.additionalProperties && node.additionalProperties !== false) {
+        // Find the container for this object using the ID we assigned in renderer
+        const objectContainer = document.getElementById(elementId);
+        if (objectContainer) {
+          const rows = objectContainer.querySelectorAll(":scope > .additional-properties > .ap-items > .ap-row");
+          rows.forEach((row, index) => {
+            const keyInput = row.querySelector(".ap-key") as HTMLInputElement;
+            const key = keyInput.value.trim();
+            
+            if (key) {
+              // Reconstruct the ID used in renderer for the value
+              const valueIdPath = `${elementId}.__ap_${index}`;
+              const valueSchema = typeof node.additionalProperties === 'boolean' 
+                ? { type: 'string', title: 'Value' } as FormNode 
+                : node.additionalProperties;
+              
+              // Recursively read the value
+              obj[key] = readFormData({ ...valueSchema, title: "Value" }, valueIdPath.replace(".Value", ""));
+            }
+          });
+        }
+      }
+
+      // Read oneOf selection
+      if (node.oneOf) {
+        const selector = document.getElementById(`${elementId}__selector`) as HTMLSelectElement;
+        if (selector) {
+          const index = parseInt(selector.value, 10);
+          const selectedNode = node.oneOf[index];
+          const oneOfData = readFormData(selectedNode, path); // Use parent path
+          Object.assign(obj, oneOfData);
+        }
+      }
+      
       return obj;
+
+    case "array":
+      const arrayResult: any[] = [];
+      const arrayContainer = document.getElementById(elementId);
+      
+      if (arrayContainer && node.items) {
+        const rows = arrayContainer.querySelectorAll(":scope > .array-items > .array-item-row");
+        rows.forEach((row, index) => {
+          const itemTitle = `Item ${index + 1}`;
+          const itemNode = { ...node.items!, title: itemTitle };
+          const itemPath = `${elementId}.${index}`;
+          
+          arrayResult.push(readFormData(itemNode, itemPath));
+        });
+      }
+      return arrayResult;
 
     case "number":
     case "integer":
@@ -40,6 +95,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   try {
     const rootNode = await parseSchema("/schema.json");
+    console.log("Parsed schema:", rootNode);
     renderForm(rootNode, formContainer);
 
     formContainer.addEventListener("input", () => {

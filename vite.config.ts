@@ -12,5 +12,4 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@apidevtools/json-schema-ref-parser'],
   },
-  publicDir: 'public',
 })

@@ -268,6 +268,11 @@ function handleApAddItem(context: RenderContext, target: HTMLElement) {
     // Initialize OneOfs in the new row
     const newRow = container.lastElementChild;
     if (newRow) {
+      // Initialize data-original-key for the new key input to support immediate renaming
+      const newKeyInput = newRow.querySelector('.js_ap-key') as HTMLInputElement;
+      if (newKeyInput) {
+        newKeyInput.setAttribute('data-original-key', newKeyInput.value);
+      }
       newRow.querySelectorAll('.js_oneof-selector').forEach(el => {
         el.dispatchEvent(new Event('change', { bubbles: true }));
       });

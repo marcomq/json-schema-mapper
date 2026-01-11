@@ -91,10 +91,12 @@ export async function initLinked(containerId: string, schemaOrUrl: string | any,
   });
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  if (document.getElementById("form-container") && document.getElementById("json-output")) {
-    await initLinked("form-container", "/schema.json", "json-output");
-  } else if (document.getElementById("form-container")) {
-    await init("form-container", "/schema.json");
-  }
-});
+if (typeof document !== 'undefined') {
+  document.addEventListener("DOMContentLoaded", async () => {
+    if (document.getElementById("form-container") && document.getElementById("json-output")) {
+      await initLinked("form-container", "/schema.json", "json-output");
+    } else if (document.getElementById("form-container")) {
+      await init("form-container", "/schema.json");
+    }
+  });
+}

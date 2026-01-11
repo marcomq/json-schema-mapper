@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
@@ -11,5 +12,8 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: ['@apidevtools/json-schema-ref-parser'],
+  },
+  test: {
+    environment: 'happy-dom',
   },
 })

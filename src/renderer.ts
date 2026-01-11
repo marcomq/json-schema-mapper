@@ -62,7 +62,7 @@ export function renderNode(node: FormNode, path: string = "", headless: boolean 
     // If no key (e.g. root or oneOf variant), use a prefixed title to avoid collision
     // and allow resolvePath to skip it.
     const safeTitle = node.title.replace(/[^a-zA-Z0-9]/g, '');
-    segment = path ? `__var_${safeTitle}` : safeTitle;
+    segment = path ? `__var_${safeTitle}` : (safeTitle || 'root');
   }
 
   const elementId = path ? `${path}.${segment}` : segment;

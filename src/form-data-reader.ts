@@ -5,7 +5,7 @@ export function readFormData(node: FormNode, path: string = ""): any {
   if (!segment) {
     // Match logic in renderer.ts
     const safeTitle = node.title.replace(/[^a-zA-Z0-9]/g, '');
-    segment = path ? `__var_${safeTitle}` : safeTitle;
+    segment = path ? `__var_${safeTitle}` : (safeTitle || 'root');
   }
 
   const elementId = path ? `${path}.${segment}` : segment;

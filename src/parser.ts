@@ -25,6 +25,7 @@ export interface FormNode {
   minimum?: number;
   maximum?: number;
   pattern?: string;
+  format?: string;
   // ... other properties we might need for rendering
 }
 
@@ -155,6 +156,7 @@ export function transformSchemaToFormNode(
     minimum: schemaObj.minimum,
     maximum: schemaObj.maximum,
     pattern: schemaObj.pattern,
+    format: schemaObj.format,
   };
 
   // Handle oneOf
@@ -301,6 +303,7 @@ function mergeAllOf(schema: JSONSchema): JSONSchema {
     if (flattenedSub.maximum !== undefined) merged.maximum = flattenedSub.maximum;
     if (flattenedSub.pattern !== undefined) merged.pattern = flattenedSub.pattern;
     if (flattenedSub.enum !== undefined) merged.enum = flattenedSub.enum;
+    if (flattenedSub.format !== undefined) merged.format = flattenedSub.format;
   });
 
   return merged as JSONSchema;

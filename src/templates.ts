@@ -1,7 +1,29 @@
 import { FormNode } from "./parser";
 import { getUiText } from "./i18n";
 
-const defaultTemplates: any = {
+export interface TemplateRenderer<T> {
+  renderFieldWrapper(node: FormNode, elementId: string, input: T, className?: string): T;
+  renderFieldsetWrapper(node: FormNode, elementId: string, content: T, className?: string): T;
+  renderString(node: FormNode, elementId: string): T;
+  renderNumber(node: FormNode, elementId: string): T;
+  renderBoolean(node: FormNode, elementId: string, attributes?: string): T;
+  renderSelect(node: FormNode, elementId: string, options: string[]): T;
+  renderObject(node: FormNode, elementId: string, content: T): T;
+  renderAdditionalProperties(node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): T;
+  renderOneOf(node: FormNode, elementId: string): T;
+  renderArray(node: FormNode, elementId: string): T;
+  renderArrayItem(item: T): T;
+  renderAdditionalPropertyRow(value: T, defaultKey?: string, uniqueId?: string): T;
+  renderLayoutGroup(title: string | undefined, content: T, className?: string): T;
+  renderFormWrapper(content: T): T;
+  renderNull(node: FormNode): T;
+  renderUnsupported(node: FormNode): T;
+  renderHeadlessObject(elementId: string, content: T): T;
+  renderSchemaError(error: any): T;
+  renderFragment(elements: T[]): T;
+}
+
+const htmlRenderer: TemplateRenderer<string> = {
   renderFieldWrapper: (node: FormNode, elementId: string, inputHtml: string, className: string = "mb-3"): string => {
     return `
     <div class="${className}">
@@ -27,9 +49,20 @@ const defaultTemplates: any = {
     const pattern = node.pattern ? `pattern="${node.pattern}"` : '';
     const minLength = node.minLength ? `minlength="${node.minLength}"` : '';
     const maxLength = node.maxLength ? `maxlength="${node.maxLength}"` : '';
+    let inputType = 'text';
+
+    if (node.format) {
+      switch (node.format) {
+        case 'email': inputType = 'email'; break;
+        case 'uri': inputType = 'url'; break;
+        case 'date': inputType = 'date'; break;
+        case 'time': inputType = 'time'; break;
+        case 'date-time': inputType = 'datetime-local'; break;
+      }
+    }
     
-    const inputHtml = `<input type="text" class="form-control" id="${elementId}" value="${node.defaultValue || ''}" ${required} ${pattern} ${minLength} ${maxLength}>`;
-    return currentTemplates.renderFieldWrapper(node, elementId, inputHtml);
+    const inputHtml = `<input type="${inputType}" class="form-control" id="${elementId}" value="${node.defaultValue || ''}" ${required} ${pattern} ${minLength} ${maxLength}>`;
+    return htmlRenderer.renderFieldWrapper(node, elementId, inputHtml);
   },
 
   renderNumber: (node: FormNode, elementId: string): string => {
@@ -37,8 +70,9 @@ const defaultTemplates: any = {
     const min = node.minimum !== undefined ? `min="${node.minimum}"` : '';
     const max = node.maximum !== undefined ? `max="${node.maximum}"` : '';
 
-    const inputHtml = `<input type="number" class="form-control" id="${elementId}" value="${node.defaultValue || ''}" ${required} ${min} ${max}>`;
-    return currentTemplates.renderFieldWrapper(node, elementId, inputHtml);
+    const val = node.defaultValue !== undefined ? node.defaultValue : '';
+    const inputHtml = `<input type="number" class="form-control" id="${elementId}" value="${val}" ${required} ${min} ${max}>`;
+    return htmlRenderer.renderFieldWrapper(node, elementId, inputHtml);
   },
 
   renderBoolean: (node: FormNode, elementId: string, attributes: string = ""): string => {
@@ -61,11 +95,11 @@ const defaultTemplates: any = {
     const required = node.required ? 'required' : '';
 
     const selectHtml = `<select class="form-select" id="${elementId}" ${required}>${opts}</select>`;
-    return currentTemplates.renderFieldWrapper(node, elementId, selectHtml);
+    return htmlRenderer.renderFieldWrapper(node, elementId, selectHtml);
   },
 
   renderObject: (node: FormNode, elementId: string, contentHtml: string): string => {
-    return currentTemplates.renderFieldsetWrapper(node, elementId, contentHtml, "ui_obj");
+    return htmlRenderer.renderFieldsetWrapper(node, elementId, contentHtml, "ui_obj");
   },
 
   renderAdditionalProperties: (node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): string => {
@@ -111,7 +145,7 @@ const defaultTemplates: any = {
     `;
 
     const wrapperNode = { ...node, title: getUiText("type_variant", "Type / Variant"), description: undefined, required: false };
-    return currentTemplates.renderFieldWrapper(wrapperNode, `${elementId}__selector`, selectHtml, "mt-3 border-top pt-3");
+    return htmlRenderer.renderFieldWrapper(wrapperNode, `${elementId}__selector`, selectHtml, "mt-3 border-top pt-3");
   },
 
   renderArray: (node: FormNode, elementId: string): string => {
@@ -119,7 +153,7 @@ const defaultTemplates: any = {
       <div class="array-items js_array-items" id="${elementId}-items"></div>
       ${node.items ? `<button type="button" class="btn btn-sm btn-outline-primary mt-2 btn-add-array-item js_btn-add-array-item" data-id="${elementId}" data-target="${elementId}-items">${getUiText("add_item", "Add Item")}</button>` : ''}
     `;
-    return currentTemplates.renderFieldsetWrapper(node, elementId, contentHtml, "ui_arr");
+    return htmlRenderer.renderFieldsetWrapper(node, elementId, contentHtml, "ui_arr");
   },
 
   renderArrayItem: (itemHtml: string): string => {
@@ -177,32 +211,37 @@ const defaultTemplates: any = {
     <br>
     <small>${String(error)}</small>
   </div>`;
+  },
+
+  renderFragment: (elements: string[]): string => {
+    return elements.join('');
   }
 };
 
-let currentTemplates = { ...defaultTemplates };
+let currentRenderer: TemplateRenderer<any> = htmlRenderer;
 
-export type Templates = typeof defaultTemplates;
+export type Templates = TemplateRenderer<string>;
 
-export function setTemplates(templates: Partial<Templates>) {
-  currentTemplates = { ...currentTemplates, ...templates };
+export function setTemplates<T>(renderer: TemplateRenderer<T>) {
+  currentRenderer = renderer;
 }
 
-export function renderFieldWrapper(node: FormNode, elementId: string, inputHtml: string, className: string = "mb-3"): string { return currentTemplates.renderFieldWrapper(node, elementId, inputHtml, className); }
-export function renderFieldsetWrapper(node: FormNode, elementId: string, contentHtml: string, className: string = ""): string { return currentTemplates.renderFieldsetWrapper(node, elementId, contentHtml, className); }
-export function renderString(node: FormNode, elementId: string): string { return currentTemplates.renderString(node, elementId); }
-export function renderNumber(node: FormNode, elementId: string): string { return currentTemplates.renderNumber(node, elementId); }
-export function renderBoolean(node: FormNode, elementId: string, attributes: string = ""): string { return currentTemplates.renderBoolean(node, elementId, attributes); }
-export function renderSelect(node: FormNode, elementId: string, options: string[] = []): string { return currentTemplates.renderSelect(node, elementId, options); }
-export function renderObject(node: FormNode, elementId: string, contentHtml: string): string { return currentTemplates.renderObject(node, elementId, contentHtml); }
-export function renderAdditionalProperties(node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): string { return currentTemplates.renderAdditionalProperties(node, elementId, options); }
-export function renderOneOf(node: FormNode, elementId: string): string { return currentTemplates.renderOneOf(node, elementId); }
-export function renderArray(node: FormNode, elementId: string): string { return currentTemplates.renderArray(node, elementId); }
-export function renderArrayItem(itemHtml: string): string { return currentTemplates.renderArrayItem(itemHtml); }
-export function renderAdditionalPropertyRow(valueHtml: string, defaultKey: string = "", uniqueId: string = ""): string { return currentTemplates.renderAdditionalPropertyRow(valueHtml, defaultKey, uniqueId); }
-export function renderLayoutGroup(title: string | undefined, contentHtml: string, className?: string): string { return currentTemplates.renderLayoutGroup(title, contentHtml, className); }
-export function renderFormWrapper(html: string): string { return currentTemplates.renderFormWrapper(html); }
-export function renderNull(node: FormNode): string { return currentTemplates.renderNull(node); }
-export function renderUnsupported(node: FormNode): string { return currentTemplates.renderUnsupported(node); }
-export function renderHeadlessObject(elementId: string, contentHtml: string): string { return currentTemplates.renderHeadlessObject(elementId, contentHtml); }
-export function renderSchemaError(error: any): string { return currentTemplates.renderSchemaError(error); }
+export function renderFieldWrapper(node: FormNode, elementId: string, input: any, className: string = "mb-3") { return currentRenderer.renderFieldWrapper(node, elementId, input, className); }
+export function renderFieldsetWrapper(node: FormNode, elementId: string, content: any, className: string = "") { return currentRenderer.renderFieldsetWrapper(node, elementId, content, className); }
+export function renderString(node: FormNode, elementId: string) { return currentRenderer.renderString(node, elementId); }
+export function renderNumber(node: FormNode, elementId: string) { return currentRenderer.renderNumber(node, elementId); }
+export function renderBoolean(node: FormNode, elementId: string, attributes: string = "") { return currentRenderer.renderBoolean(node, elementId, attributes); }
+export function renderSelect(node: FormNode, elementId: string, options: string[] = []) { return currentRenderer.renderSelect(node, elementId, options); }
+export function renderObject(node: FormNode, elementId: string, content: any) { return currentRenderer.renderObject(node, elementId, content); }
+export function renderAdditionalProperties(node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }) { return currentRenderer.renderAdditionalProperties(node, elementId, options); }
+export function renderOneOf(node: FormNode, elementId: string) { return currentRenderer.renderOneOf(node, elementId); }
+export function renderArray(node: FormNode, elementId: string) { return currentRenderer.renderArray(node, elementId); }
+export function renderArrayItem(item: any) { return currentRenderer.renderArrayItem(item); }
+export function renderAdditionalPropertyRow(value: any, defaultKey: string = "", uniqueId: string = "") { return currentRenderer.renderAdditionalPropertyRow(value, defaultKey, uniqueId); }
+export function renderLayoutGroup(title: string | undefined, content: any, className?: string) { return currentRenderer.renderLayoutGroup(title, content, className); }
+export function renderFormWrapper(content: any) { return currentRenderer.renderFormWrapper(content); }
+export function renderNull(node: FormNode) { return currentRenderer.renderNull(node); }
+export function renderUnsupported(node: FormNode) { return currentRenderer.renderUnsupported(node); }
+export function renderHeadlessObject(elementId: string, content: any) { return currentRenderer.renderHeadlessObject(elementId, content); }
+export function renderSchemaError(error: any) { return currentRenderer.renderSchemaError(error); }
+export function renderFragment(elements: any[]) { return currentRenderer.renderFragment(elements); }

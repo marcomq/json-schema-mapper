@@ -35,6 +35,25 @@ The application follows a clear pipeline to transform a JSON Schema into an inte
 4.  **Form Rendering**: `src/index.ts` passes the `FormNode` tree to `src/renderer.ts`, which is responsible for generating and injecting the corresponding HTML form elements into the DOM.
 5.  **Live JSON Output**: As the user interacts with the generated form, the application dynamically updates a live JSON output, reflecting the current state of the form data.
 
+## Validation
+
+The application uses AJV (Another JSON Schema Validator) for robust, standard-compliant validation.
+
+### Architecture
+
+1.  **Initialization**: When a schema is parsed in `src/parser.ts`, a bundled version (resolving external refs but keeping internal refs to avoid recursion issues) is passed to `src/validator.ts`.
+2.  **Compilation**: `src/validator.ts` initializes an `Ajv2020` instance, registers standard formats (via `ajv-formats`) and custom formats (e.g., `uint64`), and compiles the schema into a validation function.
+3.  **Mapping**: During rendering (`src/renderer.ts`), the application builds a registry mapping AJV data paths (JSON pointers like `/server/port`) to HTML Element IDs.
+4.  **Real-time Validation**:
+    *   When the user modifies the form, the current data is extracted from the DOM.
+    *   The data is passed to the compiled AJV validator.
+    *   If errors occur, they are mapped back to specific DOM elements using the registry, and error messages are displayed inline.
+
+### Supported Formats
+
+In addition to standard JSON Schema formats (email, date-time, etc.), the validator supports the following custom integer formats often found in systems like Protobuf or Go:
+*   `uint`, `uint8`, `uint16`, `uint32`, `uint64`
+
 ## Project Structure
 
 ```text

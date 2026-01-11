@@ -2,6 +2,7 @@ import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { JSONSchema } from "json-schema-to-ts";
 import { getKeyText, getDescriptionText } from "./i18n";
 import { CONFIG } from "./config";
+import { initValidator } from "./validator";
 
 /**
  * A simplified representation of a schema property, designed for easy
@@ -37,9 +38,11 @@ export interface FormNode {
 export async function parseSchema(schema: JSONSchema | string): Promise<FormNode> {
   try {
     const parser = new $RefParser();
+    // Create a copy for AJV if it's an object, to prevent dereference from affecting it
+    const schemaForAjv = typeof schema === 'object' ? JSON.parse(JSON.stringify(schema)) : schema;
+
     // Parse first to get the raw structure and check for root $ref
     const parsedSchema = (await parser.parse(schema as any)) as JSONSchema;
-    console.log(parsedSchema); // TODO
 
     const rootRef = typeof parsedSchema === "object" ? (parsedSchema as Exclude<JSONSchema, boolean>).$ref : undefined;
     const rootAdditionalPropertiesRef =
@@ -77,7 +80,12 @@ export async function parseSchema(schema: JSONSchema | string): Promise<FormNode
     }
 
     // Transform the raw schema into our simplified FormNode tree
-    console.log("dereferencedSchema:", finalSchema); // TODO
+    
+    // Initialize validator with bundled schema to handle recursion correctly without stack overflow
+    const ajvParser = new $RefParser();
+    const bundledSchema = (await ajvParser.bundle(schemaForAjv as any)) as JSONSchema;
+    initValidator(bundledSchema);
+    
     return transformSchemaToFormNode(finalSchema);
   } catch (err) {
     console.error("Error parsing schema:", err);

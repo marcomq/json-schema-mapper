@@ -30,7 +30,6 @@ export async function init(containerId: string, schemaOrUrl: string | any, onDat
 
   try {
     const rootNode = await parseSchema(schemaOrUrl);
-    console.log("Parsed schema:", rootNode);
 
     // Register custom renderer for TLS to restore the toggle functionality
     setCustomRenderers(CUSTOM_RENDERERS as any);

@@ -5,7 +5,7 @@
       "title": "Integrate Schema Validator (AJV)",
       "description": "Replace HTML5 validation with AJV to support complex validation logic, 'format' keywords, and better error reporting.",
       "priority": "High",
-      "status": "Pending",
+      "status": "Done",
       "relevantFiles": [
         "src/parser.ts",
         "src/renderer.ts",

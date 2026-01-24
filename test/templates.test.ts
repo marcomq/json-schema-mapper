@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import * as templates from '../src/templates';
+import { domRenderer } from '../src/dom-renderer';
 import { FormNode } from '../src/parser';
 
 describe('Templates', () => {
@@ -12,7 +12,8 @@ describe('Templates', () => {
       maxLength: 20,
       pattern: '^[a-z]+$'
     };
-    const html = templates.renderString(node, 'user_id');
+    const element = domRenderer.renderString(node, 'user_id');
+    const html = (element as HTMLElement).outerHTML;
     
     expect(html).toContain('id="user_id"');
     expect(html).toContain('required');
@@ -20,7 +21,7 @@ describe('Templates', () => {
     expect(html).toContain('maxlength="20"');
     expect(html).toContain('pattern="^[a-z]+$"');
     // Check label for required asterisk
-    expect(html).toContain('Username <span class="text-danger">*</span>');
+    expect(html).toContain('Username<span class="text-danger">*</span>');
   });
 
   it('renderNumber should include range attributes', () => {
@@ -30,7 +31,8 @@ describe('Templates', () => {
       minimum: 18,
       maximum: 99
     };
-    const html = templates.renderNumber(node, 'age_id');
+    const element = domRenderer.renderNumber(node, 'age_id');
+    const html = (element as HTMLElement).outerHTML;
     
     expect(html).toContain('type="number"');
     expect(html).toContain('min="18"');
@@ -43,7 +45,8 @@ describe('Templates', () => {
       title: 'Agree',
       defaultValue: true
     };
-    const html = templates.renderBoolean(node, 'bool_id');
+    const element = domRenderer.renderBoolean(node, 'bool_id');
+    const html = (element as HTMLElement).outerHTML;
     
     expect(html).toContain('type="checkbox"');
     expect(html).toContain('checked');
@@ -56,9 +59,10 @@ describe('Templates', () => {
       defaultValue: 'blue',
       enum: ['red', 'blue', 'green']
     };
-    const html = templates.renderSelect(node, 'select_id', node.enum);
+    const element = domRenderer.renderSelect(node, 'select_id', node.enum as string[]);
+    const html = (element as HTMLElement).outerHTML;
     
-    expect(html).toContain('<option value="blue" selected>blue</option>');
-    expect(html).toContain('<option value="red" >red</option>');
+    expect(html).toContain('<option value="blue" selected="true">blue</option>');
+    expect(html).toContain('<option value="red">red</option>');
   });
 });

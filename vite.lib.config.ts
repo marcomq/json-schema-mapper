@@ -16,7 +16,7 @@ export default defineConfig({
         // 1. Generate customization.dist.js
         try {
           const customizationSrc = fs.readFileSync(resolve(exampleDir, 'customization.js'), 'utf-8');
-          const distImport = "import { renderObject, renderProperties, templates, setI18n, setConfig } from '../dist/json-schema-mapper.js';";
+          const distImport = "import { renderObject, renderProperties, domRenderer, setI18n, setConfig } from '../dist/json-schema-mapper.js';";
           
           const customizationDist = [
               distImport,

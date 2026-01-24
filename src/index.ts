@@ -1,19 +1,18 @@
 import { parseSchema } from "./parser";
 import { renderForm } from "./renderer";
 import { type CustomRenderer } from "./types";
-import * as templates from "./templates";
 import { generateDefaultData } from "./form-data-reader";
 import { Store } from "./state";
 import { CONFIG } from "./config";
+import { domRenderer } from "./dom-renderer";
 
 export { setConfig } from "./config";
 export { setI18n } from "./i18n";
-export { setTemplates } from "./templates";
 export { renderNode, renderObject, renderProperties } from "./renderer";
 export type { RenderContext, CustomRenderer } from "./types";
-export { templates };
 export { generateDefaultData } from "./form-data-reader";
 export { adaptUiSchema } from "./ui-schema-adapter";
+export { domRenderer };
 
 let globalCustomRenderers: Record<string, CustomRenderer<any>> = {};
 
@@ -65,7 +64,8 @@ export async function init(containerId: string, schemaOrUrl: string | any, onDat
     };
     
   } catch (error) {
-    formContainer.innerHTML = templates.renderSchemaError(error);
+    formContainer.innerHTML = '';
+    formContainer.appendChild(domRenderer.renderSchemaError(error));
     console.error(error);
     throw error;
   }

@@ -32,27 +32,28 @@ describe('Format Support', () => {
     };
     
     // Helper to extract type attribute from HTML string
-    const getType = (html: string) => {
+    const getType = (node: Node) => {
+      const html = (node as HTMLElement).outerHTML;
       const match = html.match(/<input[^>]*type="([^"]+)"/);
       return match ? match[1] : null;
     };
 
-    const emailHtml = renderNode(context, rootNode.properties!['emailField'], 'root.emailField') as string;
-    expect(getType(emailHtml)).toBe('email');
+    const emailNode = renderNode(context, rootNode.properties!['emailField'], 'root.emailField');
+    expect(getType(emailNode)).toBe('email');
 
-    const uriHtml = renderNode(context, rootNode.properties!['uriField'], 'root.uriField') as string;
-    expect(getType(uriHtml)).toBe('url');
+    const uriNode = renderNode(context, rootNode.properties!['uriField'], 'root.uriField');
+    expect(getType(uriNode)).toBe('url');
 
-    const dateHtml = renderNode(context, rootNode.properties!['dateField'], 'root.dateField') as string;
-    expect(getType(dateHtml)).toBe('date');
+    const dateNode = renderNode(context, rootNode.properties!['dateField'], 'root.dateField');
+    expect(getType(dateNode)).toBe('date');
 
-    const timeHtml = renderNode(context, rootNode.properties!['timeField'], 'root.timeField') as string;
-    expect(getType(timeHtml)).toBe('time');
+    const timeNode = renderNode(context, rootNode.properties!['timeField'], 'root.timeField');
+    expect(getType(timeNode)).toBe('time');
 
-    const dateTimeHtml = renderNode(context, rootNode.properties!['dateTimeField'], 'root.dateTimeField') as string;
-    expect(getType(dateTimeHtml)).toBe('datetime-local');
+    const dateTimeNode = renderNode(context, rootNode.properties!['dateTimeField'], 'root.dateTimeField');
+    expect(getType(dateTimeNode)).toBe('datetime-local');
 
-    const defaultHtml = renderNode(context, rootNode.properties!['defaultField'], 'root.defaultField') as string;
-    expect(getType(defaultHtml)).toBe('text');
+    const defaultNode = renderNode(context, rootNode.properties!['defaultField'], 'root.defaultField');
+    expect(getType(defaultNode)).toBe('text');
   });
 });

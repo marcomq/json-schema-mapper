@@ -1,6 +1,28 @@
 import { FormNode } from "./parser";
 import { Store } from "./state";
 
+export interface TemplateRenderer<T> {
+  renderFieldWrapper(node: FormNode, elementId: string, input: T, className?: string): T;
+  renderFieldsetWrapper(node: FormNode, elementId: string, content: T, className?: string): T;
+  renderString(node: FormNode, elementId: string): T;
+  renderNumber(node: FormNode, elementId: string): T;
+  renderBoolean(node: FormNode, elementId: string, attributes?: string): T;
+  renderSelect(node: FormNode, elementId: string, options: string[]): T;
+  renderObject(node: FormNode, elementId: string, content: T): T;
+  renderAdditionalProperties(node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): T;
+  renderOneOf(node: FormNode, elementId: string): T;
+  renderArray(node: FormNode, elementId: string): T;
+  renderArrayItem(item: T): T;
+  renderAdditionalPropertyRow(value: T, defaultKey?: string, uniqueId?: string): T;
+  renderLayoutGroup(title: string | undefined, content: T, className?: string): T;
+  renderFormWrapper(content: T): T;
+  renderNull(node: FormNode): T;
+  renderUnsupported(node: FormNode): T;
+  renderHeadlessObject(elementId: string, content: T): T;
+  renderSchemaError(error: any): T;
+  renderFragment(elements: T[]): T;
+}
+
 export interface RenderContext {
   store: Store<any>;
   config: any;
@@ -11,7 +33,7 @@ export interface RenderContext {
   rootNode: FormNode;
 }
 
-export interface CustomRenderer<T = any> {
+export interface CustomRenderer<T = Node> {
   render?: (node: FormNode, path: string, elementId: string, dataPath: string, context: RenderContext) => T;
   widget?: string;
   options?: string[];

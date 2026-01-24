@@ -3,7 +3,7 @@ import { FormNode } from "./parser";
 import { renderNode, findCustomRenderer, hydrateNodeWithData } from "./renderer";
 import { generateDefaultData } from "./form-data-reader";
 import { validateData } from "./validator";
-import * as templates from "./templates";
+import { domRenderer } from "./dom-renderer";
 
 export function attachInteractivity(context: RenderContext, container: HTMLElement) {
   setupVisibilityHandlers(container);
@@ -127,7 +127,8 @@ function handleOneOfChange(context: RenderContext, target: HTMLSelectElement) {
     // Use the current elementId as the base path for the child option to ensure correct nesting
     const path = elementId!;
     const parentDataPath = context.elementIdToDataPath.get(elementId!) || "";
-    contentContainer.innerHTML = renderNode(context, selectedNode, path, true, parentDataPath) as unknown as string;
+    contentContainer.innerHTML = '';
+    contentContainer.appendChild(renderNode(context, selectedNode, path, true, parentDataPath));
 
     // Update Store with new structure (merging common props + new oneOf defaults)
     if (storePath) {
@@ -185,9 +186,9 @@ function handleArrayAddItem(context: RenderContext, target: HTMLElement) {
     const itemNode = { ...node.items, title: itemTitle };
     const parentDataPath = context.elementIdToDataPath.get(elementId!) || "";
     const itemDataPath = `${parentDataPath}/${index}`;
-    const innerHtml = renderNode(context, itemNode, `${elementId}.${index}`, false, itemDataPath) as unknown as string;
-    const itemHtml = templates.renderArrayItem(innerHtml);
-    container!.insertAdjacentHTML('beforeend', itemHtml);
+    const innerNode = renderNode(context, itemNode, `${elementId}.${index}`, false, itemDataPath);
+    const itemNodeWrapper = domRenderer.renderArrayItem(innerNode);
+    container!.appendChild(itemNodeWrapper);
 
       // Initialize OneOfs in the new item
       const newItem = container!.lastElementChild;
@@ -244,7 +245,7 @@ function handleApAddItem(context: RenderContext, target: HTMLElement) {
     const valueNode = { ...valueSchema, title: 'Value', key: 'Value' };
     // APs are tricky for data path mapping because key is dynamic. 
     // We use a placeholder or skip validation mapping for now.
-    const valueHtml = renderNode(context, valueNode, `${elementId}.__ap_${index}`, false, `${context.elementIdToDataPath.get(elementId!) || ""}/__ap_${index}`) as unknown as string;
+    const valueNodeRendered = renderNode(context, valueNode, `${elementId}.__ap_${index}`, false, `${context.elementIdToDataPath.get(elementId!) || ""}/__ap_${index}`);
     
     let defaultKey = "";
     const renderer = findCustomRenderer(context, elementId || "");
@@ -260,10 +261,10 @@ function handleApAddItem(context: RenderContext, target: HTMLElement) {
     
     const uniqueId = `${elementId}.__ap_${index}_key`;
     
-    const rowHtml = renderer?.renderAdditionalPropertyRow 
-      ? renderer.renderAdditionalPropertyRow(valueHtml, defaultKey, uniqueId)
-      : templates.renderAdditionalPropertyRow(valueHtml, defaultKey, uniqueId);
-    container.insertAdjacentHTML('beforeend', rowHtml);
+    const rowNode = renderer?.renderAdditionalPropertyRow 
+      ? renderer.renderAdditionalPropertyRow(valueNodeRendered, defaultKey, uniqueId)
+      : domRenderer.renderAdditionalPropertyRow(valueNodeRendered, defaultKey, uniqueId);
+    container.appendChild(rowNode);
 
     // Initialize OneOfs in the new row
     const newRow = container.lastElementChild;

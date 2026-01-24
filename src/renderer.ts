@@ -1,8 +1,8 @@
 import { FormNode } from "./parser";
-import * as templates from "./templates";
 import { Store } from "./state";
 import { RenderContext, CustomRenderer } from "./types";
 import { attachInteractivity } from "./events";
+import { domRenderer } from "./dom-renderer";
 
 // Configuration for specific fields
 const DEFAULT_CUSTOM_RENDERERS: Record<string, CustomRenderer<any>> = {
@@ -35,15 +35,19 @@ export function renderForm(rootNode: FormNode, formContainer: HTMLElement, store
     rootNode
   };
 
-  const html = renderNode(context, rootNode, "", false, "") as unknown as string;
-  formContainer.innerHTML = templates.renderFormWrapper(html);
+  const node = renderNode(context, rootNode, "", false, "");
+  const form = domRenderer.renderFormWrapper(node);
+  
+  formContainer.innerHTML = '';
+  formContainer.appendChild(form);
+  
   attachInteractivity(context, formContainer);
 }
 
-export function findCustomRenderer<T>(context: RenderContext, elementId: string): CustomRenderer<T> | undefined {
+export function findCustomRenderer(context: RenderContext, elementId: string): CustomRenderer<Node> | undefined {
   const fullPathKey = elementId.toLowerCase();
   let maxMatchLen = -1;
-  let bestMatch: CustomRenderer<T> | undefined;
+  let bestMatch: CustomRenderer<Node> | undefined;
 
   for (const key in context.customRenderers) {
     const lowerKey = key.toLowerCase();
@@ -56,26 +60,35 @@ export function findCustomRenderer<T>(context: RenderContext, elementId: string)
   return bestMatch;
 }
 
-export function renderNode<T = any>(contextOrNode: RenderContext | FormNode, nodeOrPath: FormNode | string, pathOrHeadless: string | boolean = "", headlessOrDataPath: boolean | string = false, dataPath: string = ""): T {
+export function renderNode(context: RenderContext, node: FormNode, path?: string, headless?: boolean, dataPath?: string): Node;
+export function renderNode(
+  arg1: RenderContext | FormNode,
+  arg2: FormNode | string,
+  arg3: string | boolean = "",
+  arg4: boolean | string = false,
+  arg5: string = ""
+): Node {
   let context: RenderContext;
   let node: FormNode;
   let path: string;
   let headless: boolean;
-  let dPath: string;
+  let dataPath: string;
 
-  if (isRenderContext(contextOrNode)) {
-    context = contextOrNode;
-    node = nodeOrPath as FormNode;
-    path = pathOrHeadless as string;
-    headless = headlessOrDataPath as boolean;
-    dPath = dataPath;
+  if (isRenderContext(arg1)) {
+    context = arg1;
+    node = arg2 as FormNode;
+    path = arg3 as string;
+    headless = arg4 as boolean;
+    dataPath = arg5;
   } else {
     if (!activeContext) throw new Error("RenderContext missing in renderNode and no active context found.");
     context = activeContext;
-    node = contextOrNode as FormNode;
-    path = nodeOrPath as string;
-    headless = pathOrHeadless as boolean;
-    dPath = headlessOrDataPath as string;
+    node = arg1 as FormNode;
+    path = arg2 as string;
+    headless = arg3 as boolean;
+    // In legacy signature: renderNode(node, path, headless, dataPath)
+    // arg4 corresponds to dataPath
+    dataPath = typeof arg4 === 'string' ? arg4 : "";
   }
 
   const prevContext = activeContext;
@@ -93,11 +106,11 @@ export function renderNode<T = any>(contextOrNode: RenderContext | FormNode, nod
   const elementId = path ? `${path}.${segment}` : segment;
 
   if (context.config.visibility.customVisibility && !context.config.visibility.customVisibility(node, elementId)) {
-    return templates.renderFragment([]) as T;
+    return domRenderer.renderFragment([]);
   }
 
   if (context.config.visibility.hiddenPaths.includes(elementId) || context.config.visibility.hiddenKeys.includes(node.title)) {
-    return templates.renderFragment([]) as T;
+    return domRenderer.renderFragment([]);
   }
   
   // Register node for potential lookups
@@ -106,7 +119,7 @@ export function renderNode<T = any>(contextOrNode: RenderContext | FormNode, nod
   context.elementIdToDataPath.set(elementId, dataPath);
 
   // 1. Custom Renderers
-  const renderer = findCustomRenderer<T>(context, elementId);
+  const renderer = findCustomRenderer(context, elementId);
 
   if (renderer?.render) {
     return renderer.render(node, path, elementId, dataPath, context);
@@ -114,96 +127,106 @@ export function renderNode<T = any>(contextOrNode: RenderContext | FormNode, nod
 
   // 2. Widget Overrides
   if (renderer?.widget === 'select') {
-    return templates.renderSelect(node, elementId, renderer.options || []) as T;
+    return domRenderer.renderSelect(node, elementId, renderer.options || []);
   }
 
   if (node.enum) {
-    return templates.renderSelect(node, elementId, node.enum.map(String)) as T;
+    return domRenderer.renderSelect(node, elementId, node.enum.map(String));
   }
 
   // 3. Standard Types
   switch (node.type) {
-    case "string": return templates.renderString(node, elementId) as T;
+    case "string": return domRenderer.renderString(node, elementId);
     case "number":
     case "integer": {
       // Prevent "null" string in value attribute for number inputs which causes browser warnings
       const safeNode = node.defaultValue === null ? { ...node, defaultValue: "" } : node;
-      return templates.renderNumber(safeNode, elementId) as T;
+      return domRenderer.renderNumber(safeNode, elementId);
     }
-    case "boolean": return templates.renderBoolean(node, elementId) as T;
-    case "object": return renderObject(context, node, path, elementId, headless, dataPath) as T;
-    case "array": return templates.renderArray(node, elementId) as T;
-    case "null": return templates.renderNull(node) as T;
-    default: return templates.renderUnsupported(node) as T;
+    case "boolean": return domRenderer.renderBoolean(node, elementId);
+    case "object": return renderObject(context, node, path, elementId, headless, dataPath);
+    case "array": return domRenderer.renderArray(node, elementId);
+    case "null": return domRenderer.renderNull(node);
+    default: return domRenderer.renderUnsupported(node);
   }
   } finally {
     activeContext = prevContext;
   }
 }
 
-export function renderObject<T = any>(contextOrNode: RenderContext | FormNode, nodeOrPath: FormNode | string, pathOrId: string, idOrHeadless: string | boolean, headlessOrDataPath: boolean | string = false, dataPath: string = ""): T {
+export function renderObject(context: RenderContext, node: FormNode, path: string, elementId: string, headless: boolean, dataPath: string): Node;
+export function renderObject(node: FormNode, elementId: string, headless: boolean, dataPath: string): Node;
+export function renderObject(
+  arg1: RenderContext | FormNode,
+  arg2: FormNode | string,
+  arg3: string | boolean,
+  arg4: string | boolean,
+  arg5: boolean | string = false,
+  arg6: string = ""
+): Node {
   let context: RenderContext;
   let node: FormNode;
   let elementId: string;
   let headless: boolean;
-  let dPath: string;
+  let dataPath: string;
 
-  if (isRenderContext(contextOrNode)) {
-    context = contextOrNode;
-    node = nodeOrPath as FormNode;
-    // _path is ignored in implementation but present in signature
-    elementId = idOrHeadless as string;
-    headless = headlessOrDataPath as boolean;
-    dPath = dataPath;
+  if (isRenderContext(arg1)) {
+    context = arg1;
+    node = arg2 as FormNode;
+    // arg3 is 'path', currently unused in renderObject logic but kept for signature compatibility
+    elementId = arg4 as string;
+    headless = arg5 as boolean;
+    dataPath = arg6;
   } else {
     if (!activeContext) throw new Error("RenderContext missing in renderObject");
     context = activeContext;
-    node = contextOrNode as FormNode;
-    elementId = pathOrId;
-    headless = idOrHeadless as boolean;
-    dPath = headlessOrDataPath as string;
+    node = arg1 as FormNode;
+    elementId = arg2 as string;
+    headless = arg3 as boolean;
+    dataPath = arg4 as string;
   }
 
-  const props = node.properties ? renderProperties<T>(context, node.properties, elementId, dataPath) : templates.renderFragment([]);
-  const ap = templates.renderAdditionalProperties(node, elementId);
-  const oneOf = templates.renderOneOf(node, elementId);
+  const props = node.properties ? renderProperties(context, node.properties, elementId, dataPath) : domRenderer.renderFragment([]);
+  const ap = domRenderer.renderAdditionalProperties(node, elementId);
+  const oneOf = domRenderer.renderOneOf(node, elementId);
   
-  const content = templates.renderFragment([props, ap, oneOf]);
+  const content = domRenderer.renderFragment([props, ap, oneOf]);
 
   if (headless) {
-    return templates.renderHeadlessObject(elementId, content) as T;
+    return domRenderer.renderHeadlessObject(elementId, content);
   }
-  return templates.renderObject(node, elementId, content) as T;
+  return domRenderer.renderObject(node, elementId, content);
 }
 
-export function renderProperties<T = any>(contextOrProps: RenderContext | { [key: string]: FormNode }, propsOrId: { [key: string]: FormNode } | string, idOrPath: string, path?: string): T {
+export function renderProperties(context: RenderContext, properties: { [key: string]: FormNode }, parentId: string, parentDataPath?: string): Node;
+export function renderProperties(arg1: any, arg2: any, arg3: string, arg4?: string): Node {
   let context: RenderContext;
   let properties: { [key: string]: FormNode };
   let parentId: string;
   let parentDataPath: string;
 
-  if (isRenderContext(contextOrProps)) {
-    context = contextOrProps;
-    properties = propsOrId as { [key: string]: FormNode };
-    parentId = idOrPath;
-    parentDataPath = path || "";
+  if (isRenderContext(arg1)) {
+    context = arg1;
+    properties = arg2 as { [key: string]: FormNode };
+    parentId = arg3;
+    parentDataPath = arg4 || "";
   } else {
     if (!activeContext) throw new Error("RenderContext missing in renderProperties");
     context = activeContext;
-    properties = contextOrProps as { [key: string]: FormNode };
-    parentId = propsOrId as string;
-    parentDataPath = idOrPath;
+    properties = arg1 as { [key: string]: FormNode };
+    parentId = arg2 as string;
+    parentDataPath = arg3;
   }
 
   const groups = context.config.layout.groups[parentId] || [];
   const groupedKeys = new Set(groups.flatMap((g: { keys: string[]; title?: string; className?: string; }) => g.keys));
  
   // Render groups
-  const groupsHtml = templates.renderFragment(groups.map((group: { keys: string[]; title?: string; className?: string; }) => {
-    const groupContent = templates.renderFragment(group.keys
-      .map(key => properties[key] ? renderNode(context, properties[key], parentId, false, `${parentDataPath}/${key}`) : templates.renderFragment([]))
+  const groupsHtml = domRenderer.renderFragment(groups.map((group: { keys: string[]; title?: string; className?: string; }) => {
+    const groupContent = domRenderer.renderFragment(group.keys
+      .map(key => properties[key] ? renderNode(context, properties[key], parentId, false, `${parentDataPath}/${key}`) : domRenderer.renderFragment([]))
     );
-    return templates.renderLayoutGroup(group.title, groupContent, group.className);
+    return domRenderer.renderLayoutGroup(group.title, groupContent, group.className);
   }));
 
   // Filter out grouped keys for the remaining list
@@ -232,11 +255,11 @@ export function renderProperties<T = any>(contextOrProps: RenderContext | { [key
     return a.localeCompare(b);
   });
 
-  const remainingHtml = templates.renderFragment(keys
+  const remainingHtml = domRenderer.renderFragment(keys
     .map(key => renderNode(context, properties[key], parentId, false, `${parentDataPath}/${key}`))
   );
 
-  return templates.renderFragment([groupsHtml, remainingHtml]) as T;
+  return domRenderer.renderFragment([groupsHtml, remainingHtml]);
 }
 
 export function hydrateNodeWithData(node: FormNode, data: any): FormNode {

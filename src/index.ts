@@ -1,4 +1,3 @@
-import "./web-components";
 import { parseSchema } from "./parser";
 import { renderForm, hydrateNodeWithData } from "./renderer";
 import { type CustomRenderer } from "./types";
@@ -14,7 +13,6 @@ export type { RenderContext, CustomRenderer } from "./types";
 export { generateDefaultData } from "./form-data-reader";
 export { adaptUiSchema } from "./ui-schema-adapter";
 export { domRenderer, rendererConfig };
-export { VsfInput, VsfSelect, VsfLabel, VsfFieldset, VsfLegend, VsfFormItem, VsfAdditionalProperties, VsfArray, VsfArrayItem, VsfOneOf, VsfAdditionalPropertyItem } from "./web-components";
 
 let globalCustomRenderers: Record<string, CustomRenderer<any>> = {};
 

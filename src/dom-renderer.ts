@@ -5,17 +5,17 @@ import { TemplateRenderer } from "./types";
 
 export const rendererConfig = {
   elements: {
-    input: 'vsf-input',
-    select: 'vsf-select',
-    label: 'vsf-label',
-    fieldset: 'vsf-fieldset',
+    input: 'input',
+    select: 'select',
+    label: 'label',
+    fieldset: 'fieldset',
     legend: 'legend',
-    formItem: 'vsf-form-item',
-    additionalProperties: 'vsf-additional-properties',
-    array: 'vsf-array',
-    arrayItem: 'vsf-array-item',
-    oneOf: 'vsf-oneof',
-    additionalPropertyItem: 'vsf-additional-property-item'
+    formItem: 'div',
+    additionalProperties: 'div',
+    array: 'div',
+    arrayItem: 'div',
+    oneOf: 'div',
+    additionalPropertyItem: 'div'
   },
   triggers: {
     oneOfSelector: 'js_oneof-selector',
@@ -79,17 +79,23 @@ export const rendererConfig = {
 
 export const domRenderer: TemplateRenderer<Node> = {
   renderFieldWrapper: (node: FormNode, elementId: string, input: Node, className?: string): Node => {
-    const attrs: any = {
+    const children: Node[] = [];
+
+    if (node.title) {
+      children.push(h(rendererConfig.elements.label, { className: rendererConfig.classes.label, for: elementId }, node.title, node.required ? h('span', { className: rendererConfig.classes.textDanger }, '*') : ''));
+    }
+
+    children.push(input);
+
+    if (node.description) {
+      children.push(h('div', { className: rendererConfig.classes.description }, node.description));
+    }
+
+    return h(rendererConfig.elements.formItem, {
       className: className || rendererConfig.classes.fieldWrapper,
-      'element-id': elementId,
-      label: node.title
-    };
-    if (node.required) attrs.required = true;
-    if (node.description) attrs.description = node.description;
-
-    return h(rendererConfig.elements.formItem, attrs, input);
+      'data-element-id': elementId
+    }, ...children);
   },
-
   renderString: (node: FormNode, elementId: string): Node => {
     const attrs: { [key: string]: any } = {
       type: 'text',
@@ -203,20 +209,29 @@ export const domRenderer: TemplateRenderer<Node> = {
   renderAdditionalProperties: (node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): Node => {
     if (!node.additionalProperties) return document.createTextNode('');
 
-    const attrs: any = {
-      className: `${rendererConfig.classes.additionalProperties} ${rendererConfig.triggers.additionalPropertiesWrapper}`,
-      'element-id': elementId,
-      'add-text': getUiText("add_property", "Add Property")
-    };
+    const children: Node[] = [];
 
-    if (options?.title !== null) {
-      attrs.title = options?.title ?? getUiText("additional_properties", "Additional Properties");
+    const titleText = options?.title ?? getUiText("additional_properties", "Additional Properties");
+    if (options?.title !== null && titleText) {
+      children.push(h('h6', {}, titleText));
     }
+
+    children.push(h('div', { className: `${rendererConfig.classes.additionalPropertiesItems} ${rendererConfig.triggers.additionalPropertyItems}` }));
+
+    const btnAttrs: any = {
+      className: `${rendererConfig.classes.buttonSecondary} ${rendererConfig.triggers.addAdditionalProperty}`,
+      type: 'button',
+      'data-id': elementId
+    };
     if (options?.keyPattern) {
-      attrs['key-pattern'] = options.keyPattern;
+      btnAttrs['data-key-pattern'] = options.keyPattern;
     }
-    
-    return h(rendererConfig.elements.additionalProperties, attrs);
+    children.push(h('button', btnAttrs, getUiText("add_property", "Add Property")));
+
+    return h(rendererConfig.elements.additionalProperties, {
+      className: `${rendererConfig.classes.additionalProperties} ${rendererConfig.triggers.additionalPropertiesWrapper}`,
+      'data-element-id': elementId
+    }, ...children);
   },
   renderOneOf: (node: FormNode, elementId: string): Node => {
     if (!node.oneOf || node.oneOf.length === 0) return document.createTextNode('');
@@ -244,33 +259,69 @@ export const domRenderer: TemplateRenderer<Node> = {
       'data-id': elementId
     }, ...optionElements);
 
-    const selectContainer = h(rendererConfig.elements.oneOf, { 'element-id': elementId }, selectEl);
+    const contentContainer = h('div', {
+      className: rendererConfig.classes.oneOfContainer,
+      id: `${elementId}__oneof_content`
+    });
+
+    const selectContainer = h(rendererConfig.elements.oneOf, { 'data-element-id': elementId }, selectEl, contentContainer);
     
     const wrapperNode = { ...node, title: getUiText("type_variant", "Type / Variant"), description: undefined, required: false };
     return domRenderer.renderFieldWrapper(wrapperNode, `${elementId}__selector`, selectContainer, rendererConfig.classes.oneOfWrapper);
   },
   renderArray: (node: FormNode, elementId: string): Node => {
-    const content = h(rendererConfig.elements.array, {
-      'element-id': elementId,
-      'add-text': getUiText("add_item", "Add Item")
+    const itemsContainer = h('div', {
+      className: `${rendererConfig.classes.arrayItems} ${rendererConfig.triggers.arrayItems}`,
+      id: `${elementId}-items`
     });
+
+    const addButton = h('button', {
+      className: `${rendererConfig.classes.buttonPrimary} ${rendererConfig.triggers.addArrayItem}`,
+      type: 'button',
+      'data-id': elementId,
+      'data-target': `${elementId}-items`
+    }, getUiText("add_item", "Add Item"));
+
+    const content = h(rendererConfig.elements.array, { 'data-element-id': elementId }, itemsContainer, addButton);
     return domRenderer.renderFieldsetWrapper(node, elementId, content, rendererConfig.classes.arrayWrapper);
   },
   renderArrayItem: (item: Node): Node => {
-    return h(rendererConfig.elements.arrayItem, {
-      className: `${rendererConfig.classes.arrayItemRow} ${rendererConfig.triggers.arrayItemRow}`, // Class needed for events.ts to find the row
-      'remove-text': getUiText("remove", "Remove")
+    const contentWrapper = h('div', {
+      className: `${rendererConfig.classes.arrayItemContent} ${rendererConfig.triggers.arrayItemContent}`
     }, item);
+
+    const removeButton = h('button', {
+      className: `${rendererConfig.classes.buttonDanger} ${rendererConfig.triggers.removeArrayItem}`,
+      type: 'button',
+      style: 'margin-top: 2rem;'
+    }, getUiText("remove", "Remove"));
+
+    return h(rendererConfig.elements.arrayItem, {
+      className: `${rendererConfig.classes.arrayItemRow} ${rendererConfig.triggers.arrayItemRow}`
+    }, contentWrapper, removeButton);
   },
   renderAdditionalPropertyRow: (value: Node, defaultKey: string = "", uniqueId: string = ""): Node => {
-    const attrs: any = {
-      className: `${rendererConfig.classes.additionalPropertyItem} ${rendererConfig.triggers.additionalPropertyRow}`, // Needed for events.ts to find the row
-      'key-value': defaultKey,
-      'remove-text': 'X'
-    };
-    if (uniqueId) attrs['key-id'] = uniqueId;
+    const keyLabel = h('label', { className: rendererConfig.classes.labelSmall, for: uniqueId }, 'Key');
+    const keyInput = h('input', {
+      type: 'text',
+      className: `${rendererConfig.classes.inputSmall} ${rendererConfig.triggers.additionalPropertyKey}`,
+      placeholder: 'Key',
+      value: defaultKey,
+      'data-original-key': defaultKey,
+      id: uniqueId
+    });
+    const keyContainer = h('div', { className: `${rendererConfig.classes.apKeyContainer} ${rendererConfig.triggers.apKeyContainer}` }, keyLabel, keyInput);
 
-    return h(rendererConfig.elements.additionalPropertyItem, attrs, value);
+    const valueWrapper = h('div', { className: `${rendererConfig.classes.apValueWrapper} ${rendererConfig.triggers.apValueWrapper}` }, value);
+
+    const removeButton = h('button', {
+      className: `${rendererConfig.classes.buttonDanger} ${rendererConfig.triggers.removeAdditionalProperty}`,
+      type: 'button'
+    }, 'X');
+
+    return h(rendererConfig.elements.additionalPropertyItem, {
+      className: `${rendererConfig.classes.additionalPropertyItem} ${rendererConfig.triggers.additionalPropertyRow}`
+    }, keyContainer, valueWrapper, removeButton);
   },
   renderLayoutGroup: (title: string | undefined, content: Node, className: string = rendererConfig.classes.layoutGroupContent): Node => {
     const children = [];

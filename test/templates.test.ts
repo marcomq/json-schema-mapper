@@ -20,8 +20,7 @@ describe('Templates', () => {
     expect(html).toContain('minlength="3"');
     expect(html).toContain('maxlength="20"');
     expect(html).toContain('pattern="^[a-z]+$"');
-    // Check label attribute on the wrapper component (rendering is handled by the web component)
-    expect(html).toContain('label="Username"');
+    expect(html).toContain('Username<span class="text-danger">*</span>');
   });
 
   it('renderNumber should include range attributes', () => {

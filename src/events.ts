@@ -217,11 +217,8 @@ function handleArrayRemoveItem(context: RenderContext, target: HTMLElement, cont
   if (row && arrayContainer) {
     const index = Array.from(arrayContainer.children).indexOf(row);
     
-    // Attempt to find the array ID prefix from the row's content
-    // The first child of the row usually contains the rendered node with the ID
-    const contentEl = row.querySelector('[id]');
-    const contentId = contentEl?.id;
-    const baseId = contentId ? contentId.substring(0, contentId.lastIndexOf('.')) : '';
+    // Derive baseId from the container ID (e.g., "root.users-items" -> "root.users")
+    const baseId = arrayContainer.id && arrayContainer.id.endsWith('-items') ? arrayContainer.id.slice(0, -6) : '';
 
     row.remove();
     
@@ -301,7 +298,7 @@ function handleApRemoveItem(context: RenderContext, target: HTMLElement, contain
   // Implementation: Find the key input in the row.
   const keyInput = row?.querySelector(`.${rendererConfig.triggers.additionalPropertyKey}`) as HTMLInputElement;
   const apElement = target.closest(`.${rendererConfig.triggers.additionalPropertiesWrapper}`);
-  const elementId = apElement?.getAttribute('element-id');
+  const elementId = apElement?.getAttribute('data-element-id');
 
   if (keyInput && keyInput.value) {
     if (elementId) {

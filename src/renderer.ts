@@ -4,8 +4,7 @@ import { RenderContext, CustomRenderer } from "./types";
 import { attachInteractivity } from "./events";
 import { domRenderer } from "./dom-renderer";
 
-// Configuration for specific fields
-const DEFAULT_CUSTOM_RENDERERS: Record<string, CustomRenderer<any>> = {
+export const DEFAULT_CUSTOM_RENDERERS: Record<string, CustomRenderer<any>> = {
   "mode": {
     widget: "select",
     options: ["consumer", "subscriber"]
@@ -17,18 +16,8 @@ const DEFAULT_CUSTOM_RENDERERS: Record<string, CustomRenderer<any>> = {
  * @param rootNode - The root FormNode of the schema.
  * @param formContainer - The HTML element to render the form into.
  */
-export function renderForm(rootNode: FormNode, formContainer: HTMLElement, store: Store<any>, config: any, customRenderers: Record<string, CustomRenderer<any>> = {}) {
-  const context: RenderContext = {
-    store,
-    rootNode,
-    config,
-    nodeRegistry: new Map(),
-    dataPathRegistry: new Map(),
-    elementIdToDataPath: new Map(),
-    customRenderers: { ...DEFAULT_CUSTOM_RENDERERS, ...customRenderers },
-  };
-
-  const node = renderNode(context, rootNode, "", false, "");
+export function renderForm(formContainer: HTMLElement, context: RenderContext) {
+  const node = renderNode(context, context.rootNode, "", false, "");
   const form = domRenderer.renderFormWrapper(node);
   
   formContainer.innerHTML = '';

@@ -1,17 +1,18 @@
 import { parseSchema } from "./parser";
-import { renderForm, hydrateNodeWithData } from "./renderer";
-import { type CustomRenderer } from "./types";
+import { renderForm, hydrateNodeWithData, DEFAULT_CUSTOM_RENDERERS } from "./renderer";
+import { type CustomRenderer, RenderContext } from "./types";
 import { generateDefaultData } from "./form-data-reader";
 import { Store } from "./state";
 import { CONFIG } from "./config";
 import { domRenderer, rendererConfig } from "./dom-renderer";
 
-export { setConfig } from "./config";
-export { setI18n } from "./i18n";
+export { setConfig, resetConfig } from "./config";
+export { setI18n, resetI18n } from "./i18n";
 export { renderNode, renderObject, renderProperties } from "./renderer";
 export type { RenderContext, CustomRenderer } from "./types";
 export { generateDefaultData } from "./form-data-reader";
 export { adaptUiSchema } from "./ui-schema-adapter";
+export { h } from "./hyperscript";
 export { domRenderer, rendererConfig };
 
 let globalCustomRenderers: Record<string, CustomRenderer<any>> = {};
@@ -60,8 +61,18 @@ export async function init(containerId: string, schemaOrUrl: string | any, initi
 
     const store = new Store<Record<string, any>>({});
     
+    const context: RenderContext = {
+      store,
+      rootNode,
+      config: CONFIG,
+      nodeRegistry: new Map(),
+      dataPathRegistry: new Map(),
+      elementIdToDataPath: new Map(),
+      customRenderers: { ...DEFAULT_CUSTOM_RENDERERS, ...globalCustomRenderers },
+    };
+
     // Render the form
-    renderForm(rootNode, formContainer, store, CONFIG, globalCustomRenderers);
+    renderForm(formContainer, context);
 
     // Initialize store
     store.reset(data);
@@ -80,8 +91,8 @@ export async function init(containerId: string, schemaOrUrl: string | any, initi
 
     const setData = (newData: any) => {
       // To ensure UI consistency (especially for arrays/oneOf), we re-render on programmatic set.
-      const hydrated = hydrateNodeWithData(rootNode, newData);
-      renderForm(hydrated, formContainer, store, CONFIG, globalCustomRenderers);
+      context.rootNode = hydrateNodeWithData(rootNode, newData);
+      renderForm(formContainer, context);
       store.reset(newData);
     }
 
@@ -90,11 +101,9 @@ export async function init(containerId: string, schemaOrUrl: string | any, initi
       getData: () => store.get(),
       setData,
       validate: async () => {
-        // We need the context populated by renderForm to map errors to DOM elements.
-        // Since renderForm doesn't return it, we can't easily call validateAndShowErrors here without refactoring renderer.ts.
-        // However, we can return the raw errors.
-        const { validateData } = await import("./validator");
-        return validateData(store.get());
+        // This validates the data and displays errors in the form UI.
+        const { validateAndShowErrors } = await import("./events");
+        return validateAndShowErrors(context);
       }
     };
     

@@ -1,5 +1,8 @@
 import { FormNode } from "./parser";
 import { Store } from "./state";
+import type { ErrorObject as AjvErrorObject } from "ajv";
+
+export type ErrorObject = AjvErrorObject;
 
 export interface TemplateRenderer<T> {
   renderFieldWrapper(node: FormNode, elementId: string, input: T, className?: string): T;

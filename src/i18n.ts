@@ -20,6 +20,10 @@ export function setI18n(map: Partial<typeof DEFAULT_I18N_MAP>) {
   if (map.ui) currentI18nMap.ui = { ...currentI18nMap.ui, ...map.ui };
 }
 
+export function resetI18n() {
+  currentI18nMap = JSON.parse(JSON.stringify(DEFAULT_I18N_MAP));
+}
+
 export function getUiText(key: string, defaultText: string = ""): string {
   return currentI18nMap.ui[key] || defaultText;
 }

@@ -91,6 +91,9 @@ export const domRenderer: TemplateRenderer<Node> = {
       children.push(h('div', { className: rendererConfig.classes.description }, node.description));
     }
 
+    // Add a placeholder for validation errors.
+    children.push(h('div', { 'data-validation-for': elementId }));
+
     return h(rendererConfig.elements.formItem, {
       className: className || rendererConfig.classes.fieldWrapper,
       'data-element-id': elementId
@@ -134,6 +137,9 @@ export const domRenderer: TemplateRenderer<Node> = {
       children.push(h('div', { className: rendererConfig.classes.description }, node.description));
     }
     children.push(content);
+
+    // Add placeholder for fieldset-level errors
+    children.push(h('div', { 'data-validation-for': elementId }));
 
     return h(rendererConfig.elements.fieldset, { className: `${rendererConfig.classes.fieldset} ${className}`, id: elementId }, ...children);
   },
@@ -181,6 +187,9 @@ export const domRenderer: TemplateRenderer<Node> = {
     if (node.description) {
       children.push(h('div', { className: rendererConfig.classes.description }, node.description));
     }
+
+    // Add a placeholder for validation errors.
+    children.push(h('div', { 'data-validation-for': elementId }));
 
     return h('div', { className: rendererConfig.classes.checkboxWrapper }, ...children);
   },
@@ -332,7 +341,11 @@ export const domRenderer: TemplateRenderer<Node> = {
     return h('div', { className: rendererConfig.classes.layoutGroup }, ...children);
   },
   renderFormWrapper: (content: Node): Node => {
-    return h('form', { id: 'generated-form' }, content);
+    const globalErrors = h('div', {
+      id: 'form-global-errors',
+      'aria-live': 'polite'
+    });
+    return h('form', { id: 'generated-form' }, globalErrors, content);
   },
   renderNull: (_node: FormNode): Node => {
     return h('div', { className: `${rendererConfig.classes.nullWrapper} ${rendererConfig.classes.textMuted}` }, 'null');

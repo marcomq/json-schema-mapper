@@ -8,7 +8,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:e2e": "playwright test",
-    "test:e2e:watch": "playwright test --watch"
+    "playground": "vite --open playground/"
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "^15.1.3",

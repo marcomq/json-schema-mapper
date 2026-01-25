@@ -1,9 +1,10 @@
-import { RenderContext } from "./types";
+import { RenderContext, ErrorObject } from "./types";
 import { FormNode } from "./parser";
 import { renderNode, findCustomRenderer, hydrateNodeWithData } from "./renderer";
 import { generateDefaultData } from "./form-data-reader";
 import { validateData } from "./validator";
 import { domRenderer } from "./dom-renderer";
+import { h } from "./hyperscript";
 import { rendererConfig } from "./dom-renderer";
 
 export function attachInteractivity(context: RenderContext, container: HTMLElement) {
@@ -86,11 +87,25 @@ function handleValueUpdate(context: RenderContext, target: HTMLInputElement | HT
   const path = resolvePath(target.id);
   if (!path) return;
 
+  const node = context.nodeRegistry.get(target.id);
+
+  // If a required field is cleared, remove it from the data to trigger AJV's `required` validation.
+  // This aligns with the user expectation that a required field cannot be empty.
+  if (target.value === '' && node?.required) {
+    context.store.removePath(path);
+    return;
+  }
+
   let value: any = target.value;
   if (target.type === 'checkbox') {
     value = (target as HTMLInputElement).checked;
   } else if (target.type === 'number') {
     value = (target as HTMLInputElement).valueAsNumber;
+    // An empty (but not required) number input results in NaN. Store as null
+    // to trigger a type error from AJV if the schema doesn't allow nulls.
+    if (isNaN(value)) {
+      value = null;
+    }
   }
   context.store.setPath(path, value);
 }
@@ -418,28 +433,164 @@ function updateAPIndices(container: HTMLElement, startIndex: number, baseId: str
   }
 }
 
-export function validateAndShowErrors(context: RenderContext) {
-  if (!context.rootNode) return;
-  const data = context.store.get();
-  const errors = validateData(data);
-  
-  // Clear existing errors
-  document.querySelectorAll(`.${rendererConfig.triggers.validationError}`).forEach(el => el.remove());
-  document.querySelectorAll(`.${rendererConfig.classes.invalid}`).forEach(el => el.classList.remove(rendererConfig.classes.invalid));
+function findElementIdForPath(context: RenderContext, ajvPath: string): string | undefined {
+  // 1. Direct lookup (works for static paths)
+  if (context.dataPathRegistry.has(ajvPath)) {
+    return context.dataPathRegistry.get(ajvPath);
+  }
 
-  if (errors) {
+  // 2. Fuzzy lookup for Additional Properties (dynamic keys)
+  // AJV path uses actual keys (e.g. "/route1/url"), Registry uses internal IDs (e.g. "/__ap_0/url")
+  const ajvSegments = ajvPath.split('/').filter(s => s);
+  
+  for (const [regPath, elementId] of context.dataPathRegistry.entries()) {
+    const regSegments = regPath.split('/').filter(s => s);
+    if (regSegments.length !== ajvSegments.length) continue;
+
+    let match = true;
+    
+    for (let i = 0; i < regSegments.length; i++) {
+      const regSeg = regSegments[i];
+      const ajvSeg = ajvSegments[i];
+
+      if (regSeg === ajvSeg) continue;
+
+      // If segment differs, check if it's an AP placeholder (e.g. "__ap_0")
+      if (regSeg.startsWith('__ap_')) {
+        // Construct path to this AP node to find its DOM element
+        const partialPath = '/' + regSegments.slice(0, i + 1).join('/');
+        const rowElementId = context.dataPathRegistry.get(partialPath);
+        
+        if (rowElementId) {
+          // Heuristic: The AP Value wrapper ID usually ends in ".Value". 
+          // The corresponding Key Input ID is the row ID + "_key".
+          // We strip ".Value" to get the row ID.
+          const rowId = rowElementId.replace(/\.Value$/, '');
+          const keyInputId = `${rowId}_key`;
+          const keyInput = document.getElementById(keyInputId) as HTMLInputElement;
+          
+          if (keyInput && keyInput.value === ajvSeg) {
+            continue; // Match found via DOM lookup
+          }
+        }
+      }
+      
+      match = false;
+      break;
+    }
+
+    if (match) return elementId;
+  }
+  
+  return undefined;
+}
+
+export function validateAndShowErrors(context: RenderContext): ErrorObject[] | null {
+  if (!context.rootNode) return null;
+  const data = context.store.get();
+  const originalErrors = validateData(data);
+  const matchedErrors = new Set<ErrorObject>();
+  
+  // Clear existing errors from placeholders and remove invalid classes
+  const formContainer = document.getElementById('generated-form');
+  if (formContainer) {
+    formContainer.querySelectorAll('[data-validation-for]').forEach(p => {
+      p.innerHTML = '';
+    });
+    formContainer.querySelectorAll(`.${rendererConfig.classes.invalid}`).forEach(el => el.classList.remove(rendererConfig.classes.invalid));
+  }
+
+  // Clear global errors
+  const globalErrorsContainer = document.getElementById('form-global-errors');
+  if (globalErrorsContainer) {
+    globalErrorsContainer.innerHTML = '';
+    globalErrorsContainer.className = '';
+  }
+
+  let errors: ErrorObject[] | null = null;
+
+  if (originalErrors) {
+    // Filter out verbose sub-schema errors when a oneOf/anyOf fails.
+    // The oneOf/anyOf error is more user-friendly.
+    const errorsByPath = new Map<string, ErrorObject[]>();
+    originalErrors.forEach(err => {
+      const path = err.instancePath;
+      if (!errorsByPath.has(path)) {
+        errorsByPath.set(path, []);
+      }
+      errorsByPath.get(path)!.push(err);
+    });
+
+    errors = [];
+    errorsByPath.forEach((pathErrors) => {
+      const oneOfError = pathErrors.find(e => e.keyword === 'oneOf' || e.keyword === 'anyOf');
+      if (oneOfError) {
+        oneOfError.message = "A valid selection is required";
+        errors!.push(oneOfError);
+
+        // Also keep 'required' errors if they point to a field that is currently visible.
+        // This ensures that if a user clears a required field inside a oneOf, they see the error on that field.
+        pathErrors.forEach(e => {
+          if (e !== oneOfError && e.keyword === 'required' && e.params.missingProperty) {
+            const targetPath = e.instancePath ? `${e.instancePath}/${e.params.missingProperty}` : `/${e.params.missingProperty}`;
+            const elementId = findElementIdForPath(context, targetPath);
+            if (elementId) {
+              const el = document.getElementById(elementId) || document.querySelector(`[data-element-id="${elementId}"]`);
+              if (el) errors!.push(e);
+            }
+          }
+        });
+      } else {
+        errors!.push(...pathErrors);
+      }
+    });
+
     errors.forEach(err => {
-      const elementId = context.dataPathRegistry.get(err.instancePath);
+      let targetPath = err.instancePath;
+
+      // Map 'required' errors to the specific field instead of the parent object
+      if (err.keyword === 'required' && err.params.missingProperty) {
+        targetPath = targetPath ? `${targetPath}/${err.params.missingProperty}` : `/${err.params.missingProperty}`;
+      }
+
+      const elementId = findElementIdForPath(context, targetPath);
       if (elementId) {
-        const el = document.getElementById(elementId);
-        if (el) {
-          el.classList.add(rendererConfig.classes.invalid);
+        const elToInvalidate = document.getElementById(elementId) || document.querySelector(`[data-element-id="${elementId}"]`);
+        const validationPlaceholder = document.querySelector(`[data-validation-for="${elementId}"]`);
+
+        if (elToInvalidate) {
+          elToInvalidate.classList.add(rendererConfig.classes.invalid);
+        }
+
+        if (validationPlaceholder) {
           const msg = document.createElement('div');
           msg.className = `${rendererConfig.classes.error} ${rendererConfig.triggers.validationError}`;
-          msg.textContent = err.message || "Invalid value";
-          el.parentElement?.appendChild(msg);
+          if (err.keyword === 'required') {
+            msg.textContent = "This field is required";
+          } else {
+            msg.textContent = err.message || "Invalid value";
+          }
+          validationPlaceholder.appendChild(msg);
+          // Mark this error as displayed only if we successfully found a place for it
+          matchedErrors.add(err);
         }
       }
     });
+
+    // Display errors that couldn't be matched to a specific input
+    const unmatchedErrors = errors.filter(err => !matchedErrors.has(err));
+    if (globalErrorsContainer) {
+      if (unmatchedErrors.length > 0) {
+        globalErrorsContainer.className = `${rendererConfig.classes.alertDanger} mb-3`;
+        const errorList = h('ul', { className: 'mb-0 ps-3' });
+        unmatchedErrors.forEach(err => {
+          const errorText = `${err.instancePath || 'Schema'}: ${err.message}`;
+          errorList.appendChild(h('li', {}, errorText));
+        });
+        globalErrorsContainer.appendChild(errorList);
+      }
+    }
   }
+
+  return errors;
 }

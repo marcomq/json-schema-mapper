@@ -36,3 +36,7 @@ export function setConfig(config: PartialConfig) {
     }
   }
 }
+
+export function resetConfig() {
+  CONFIG = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+}

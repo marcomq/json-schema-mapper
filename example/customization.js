@@ -1,8 +1,4 @@
-import { renderObject, renderProperties } from "../src/renderer";
-import { domRenderer } from "../src/dom-renderer";
-import { h } from "../src/hyperscript";
-import { setI18n } from "../src/i18n";
-import { setConfig } from "../src/config";
+import { h, renderObject, renderProperties, domRenderer, setI18n, setConfig } from "../src/index";
 
 // Apply global I18N overrides
 setI18n({

@@ -3,7 +3,10 @@ export function h(tag: string, attrs: { [key: string]: any }, ...children: (stri
 
   for (const key in attrs) {
     if (key === 'dangerouslySetInnerHTML') {
-      el.innerHTML = attrs[key];
+      const val = attrs[key];
+      if (val && typeof val === 'object' && typeof val.__html === 'string') {
+        el.innerHTML = val.__html;
+      }
     } else if (key.startsWith('on') && typeof attrs[key] === 'function') {
       el.addEventListener(key.substring(2).toLowerCase(), attrs[key]);
     } else if (key === 'className') {

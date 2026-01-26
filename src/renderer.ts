@@ -35,6 +35,7 @@ export function findCustomRenderer(context: RenderContext, elementId: string): C
     if (fullPathKey === lowerKey || fullPathKey.endsWith('.' + lowerKey)) {
       if (lowerKey.length > maxMatchLen) {
         bestMatch = context.customRenderers[key];
+        maxMatchLen = lowerKey.length;
       }
     }
   }

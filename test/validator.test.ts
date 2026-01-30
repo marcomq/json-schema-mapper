@@ -52,10 +52,10 @@ describe("Validator", () => {
     };
 
     initValidator(schema as any);
-
     expect(validateData(0)).toBeNull();
     expect(validateData(Number.MAX_SAFE_INTEGER)).toBeNull();
     expect(validateData(-1)).not.toBeNull();
     expect(validateData(10.5)).not.toBeNull();
+    expect(validateData("not a number")).not.toBeNull();
   });
 });

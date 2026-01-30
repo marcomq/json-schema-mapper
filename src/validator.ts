@@ -15,7 +15,17 @@ export function initValidator(schema: JSONSchema) {
   ajv.addFormat("uint8", { type: "number", validate: (n) => n >= 0 && n <= 255 && Number.isInteger(n) });
   ajv.addFormat("uint16", { type: "number", validate: (n) => n >= 0 && n <= 65535 && Number.isInteger(n) });
   ajv.addFormat("uint32", { type: "number", validate: (n) => n >= 0 && n <= 4294967295 && Number.isInteger(n) });
-  ajv.addFormat("uint64", { type: "number", validate: (n) => n >= 0 && Number.isInteger(n) });
+  ajv.addFormat("uint64", {
+    type: "number",
+    validate: (x) => {
+      try {
+        const n = BigInt(x);
+        return n >= 0n && n <= 18446744073709551615n; // 0 bis 2^64 - 1
+      } catch (e) {
+        return false;
+      }
+    },
+  });
 
   try {
     validateFn = ajv.compile(schema as any);

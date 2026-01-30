@@ -221,11 +221,13 @@ function handleArrayAddItem(context: RenderContext, target: HTMLElement) {
     container!.appendChild(itemNodeWrapper);
 
     // Update Store: Add default value
-    const path = resolvePath(elementId!) || [];
-    // The new item is at the index we just calculated
-    const itemPath = [...path, index];
-    const defaultValue = generateDefaultData(node.items);
-    context.store.setPath(itemPath, defaultValue);
+    const path = resolvePath(elementId!);
+    if (path) {
+      // The new item is at the index we just calculated
+      const itemPath = [...path, index];
+      const defaultValue = generateDefaultData(node.items);
+      context.store.setPath(itemPath, defaultValue);
+    }
 
     // Initialize OneOfs in the new item
     const newItem = container!.lastElementChild;
@@ -261,7 +263,7 @@ function handleArrayRemoveItem(context: RenderContext, target: HTMLElement, cont
       }
     }
 
-    if (baseId) updateArrayIndices(arrayContainer as HTMLElement, index, baseId);
+    if (baseId) updateArrayIndices(context, arrayContainer as HTMLElement, index, baseId);
     container.dispatchEvent(new Event('change', { bubbles: true }));
     validateAndShowErrors(context);
   }
@@ -304,8 +306,10 @@ function handleApAddItem(context: RenderContext, target: HTMLElement) {
     // For APs, the key is dynamic. We usually wait for the user to type the key.
     // However, if we have a defaultKey, we can set it.
     if (defaultKey) {
-       const path = resolvePath(elementId!) || [];
-      context.store.setPath([...path, defaultKey], generateDefaultData(valueSchema));
+       const path = resolvePath(elementId!);
+       if (path) {
+         context.store.setPath([...path, defaultKey], generateDefaultData(valueSchema));
+       }
     }
 
     // Initialize OneOfs in the new row
@@ -338,8 +342,10 @@ function handleApRemoveItem(context: RenderContext, target: HTMLElement, contain
 
   if (keyInput && keyInput.value) {
     if (elementId) {
-       const path = resolvePath(elementId) || [];
-       context.store.removePath([...path, keyInput.value]);
+       const path = resolvePath(elementId);
+       if (path) {
+         context.store.removePath([...path, keyInput.value]);
+       }
     }
   }
   
@@ -349,7 +355,7 @@ function handleApRemoveItem(context: RenderContext, target: HTMLElement, contain
   row?.remove();
   
   if (apContainer && index !== -1 && elementId) {
-    updateAPIndices(apContainer as HTMLElement, index, elementId);
+    updateAPIndices(context, apContainer as HTMLElement, index, elementId);
   }
   container.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -388,7 +394,7 @@ function resolvePath(elementId: string): (string | number)[] | null {
   return path;
 }
 
-function updateArrayIndices(container: HTMLElement, startIndex: number, baseId: string) {
+function updateArrayIndices(context: RenderContext, container: HTMLElement, startIndex: number, baseId: string) {
   const rows = Array.from(container.children) as HTMLElement[];
   for (let i = startIndex; i < rows.length; i++) {
     const row = rows[i];
@@ -412,10 +418,12 @@ function updateArrayIndices(container: HTMLElement, startIndex: number, baseId: 
         }
       });
     });
+
+    updateRegistryEntries(context, oldPrefix, newPrefix, `/${oldIndex}`, `/${newIndex}`);
   }
 }
 
-function updateAPIndices(container: HTMLElement, startIndex: number, baseId: string) {
+function updateAPIndices(context: RenderContext, container: HTMLElement, startIndex: number, baseId: string) {
   const rows = Array.from(container.children) as HTMLElement[];
   for (let i = startIndex; i < rows.length; i++) {
     const row = rows[i];
@@ -438,8 +446,51 @@ function updateAPIndices(container: HTMLElement, startIndex: number, baseId: str
                 }
              });
            });
+
+           updateRegistryEntries(context, oldPrefix, newPrefix, `/__ap_${oldIdx}`, `/__ap_${newIdx}`);
          }
        }
+    }
+  }
+}
+
+function updateRegistryEntries(context: RenderContext, oldPrefix: string, newPrefix: string, oldPathSuffix: string, newPathSuffix: string) {
+  const keysToMove: string[] = [];
+  for (const key of context.nodeRegistry.keys()) {
+    if (key === oldPrefix || key.startsWith(oldPrefix + '.')) {
+      keysToMove.push(key);
+    }
+  }
+
+  const rootOldPath = context.elementIdToDataPath.get(oldPrefix);
+  let rootNewPath: string | undefined;
+  if (rootOldPath && rootOldPath.endsWith(oldPathSuffix)) {
+    rootNewPath = rootOldPath.substring(0, rootOldPath.length - oldPathSuffix.length) + newPathSuffix;
+  }
+
+  for (const oldKey of keysToMove) {
+    const newKey = oldKey.replace(oldPrefix, newPrefix);
+    
+    const node = context.nodeRegistry.get(oldKey);
+    if (node) {
+      context.nodeRegistry.set(newKey, node);
+      context.nodeRegistry.delete(oldKey);
+    }
+
+    const oldPath = context.elementIdToDataPath.get(oldKey);
+    if (oldPath) {
+      let newPath = oldPath;
+      if (rootOldPath && rootNewPath && oldPath.startsWith(rootOldPath)) {
+        newPath = rootNewPath + oldPath.substring(rootOldPath.length);
+      } else if (oldPath.endsWith(oldPathSuffix)) {
+         newPath = oldPath.substring(0, oldPath.length - oldPathSuffix.length) + newPathSuffix;
+      }
+      
+      context.elementIdToDataPath.set(newKey, newPath);
+      context.elementIdToDataPath.delete(oldKey);
+      
+      context.dataPathRegistry.delete(oldPath);
+      context.dataPathRegistry.set(newPath, newKey);
     }
   }
 }

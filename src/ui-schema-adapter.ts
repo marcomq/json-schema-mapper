@@ -1,4 +1,4 @@
-import { setConfig } from "./config";
+import { setConfig, CONFIG } from "./config";
 
 export interface UISchemaElement {
   type: string;
@@ -18,51 +18,48 @@ export function adaptUiSchema(uiSchema: UISchemaElement, rootId: string) {
   const groups: { keys: string[], title?: string, className?: string }[] = [];
   const priority: string[] = [];
 
-  const processElement = (el: UISchemaElement) => {
+  const processElement = (el: UISchemaElement): string[] => {
+    const collectedKeys: string[] = [];
     if (el.type === "Control" && el.scope) {
       const key = el.scope.split('/').pop();
-      if (key) priority.push(key);
+      if (key) {
+        priority.push(key);
+        collectedKeys.push(key);
+      }
     } else if (el.type === "HorizontalLayout" && el.elements) {
       const keys: string[] = [];
       el.elements.forEach((child) => {
-        if (child.type === "Control" && child.scope) {
-          const key = child.scope.split('/').pop();
-          if (key) {
-            keys.push(key);
-            priority.push(key);
-          }
-        }
+        keys.push(...processElement(child));
       });
       if (keys.length) {
         groups.push({ keys, className: "d-flex gap-3" });
       }
+      collectedKeys.push(...keys);
     } else if (el.type === "Group" && el.elements) {
        const keys: string[] = [];
        el.elements.forEach((child) => {
-         if (child.type === "Control" && child.scope) {
-           const key = child.scope.split('/').pop();
-           if (key) {
-             keys.push(key);
-             priority.push(key);
-           }
-         }
+         keys.push(...processElement(child));
        });
        if (keys.length) {
          groups.push({ keys, title: el.label });
        }
+       collectedKeys.push(...keys);
     } else if (el.type === "VerticalLayout" && el.elements) {
-      el.elements.forEach(processElement);
+      el.elements.forEach((child) => {
+        collectedKeys.push(...processElement(child));
+      });
     }
+    return collectedKeys;
   };
 
   processElement(uiSchema);
 
   setConfig({
     layout: {
-      groups: { [rootId]: groups }
+      groups: { ...CONFIG.layout.groups, [rootId]: groups }
     },
     sorting: {
-        perObjectPriority: { [rootId]: priority }
+        perObjectPriority: { ...CONFIG.sorting.perObjectPriority, [rootId]: priority }
     }
   });
 }

@@ -6,6 +6,8 @@ export function h(tag: string, attrs: { [key: string]: any }, ...children: (stri
       const val = attrs[key];
       if (val && typeof val === 'object' && typeof val.__html === 'string') {
         el.innerHTML = val.__html;
+      } else {
+        console.warn(`[hyperscript] Invalid dangerouslySetInnerHTML passed to <${tag}>. Expected { __html: string }.`);
       }
     } else if (key.startsWith('on') && typeof attrs[key] === 'function') {
       el.addEventListener(key.substring(2).toLowerCase(), attrs[key]);

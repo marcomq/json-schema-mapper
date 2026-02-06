@@ -8,7 +8,10 @@ test('TLS toggle should show/hide options', async ({ page }) => {
 
   // Select 'mqtt' to make TLS section visible
   const inputSelector = page.locator('select[id$=".input__selector"]');
-  await inputSelector.selectOption({ label: 'mqtt' });
+  await inputSelector.selectOption({ label: 'Mqtt' });
+
+  // Click on "Advanced" to reveal the section
+  await page.getByText('Show more...').click();
 
   // Find the TLS section by the class added in customization.js
   const tlsSection = page.locator('.ui_tls');
@@ -18,7 +21,7 @@ test('TLS toggle should show/hide options', async ({ page }) => {
   const checkbox = tlsSection.getByRole('checkbox', { name: 'Required' });
   
   // Find the options container (id ends with -options)
-  const optionsDiv = page.locator('div[id$="-options"]');
+  const optionsDiv = tlsSection.locator('div[id$="-options"]');
 
   // Initially, options should be hidden
   await expect(optionsDiv).toBeHidden();

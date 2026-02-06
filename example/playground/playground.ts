@@ -1,4 +1,18 @@
-import { init, setConfig, resetConfig, resetI18n, adaptUiSchema, setCustomRenderers, setI18n, h, renderObject, renderProperties, domRenderer } from '../../src/index';
+import { 
+  init, 
+  setConfig, 
+  resetConfig, 
+  resetI18n, 
+  adaptUiSchema, 
+  setCustomRenderers, 
+  setI18n, 
+  h, 
+  renderObject, 
+  renderProperties,
+  generateDefaultData,
+  renderNode,
+  domRenderer 
+} from '../../src/index';
 import defaultSchema from '../schema.json';
 import defaultCustomization from '../customization.js?raw'; // ?raw supported by vite
 
@@ -9,16 +23,12 @@ const EXAMPLES: Record<string, { schema: any, config: any, data: any }> = {
     config: defaultCustomization,
     data: {
       "Default Route": {
-        "batch_size": 1,
-        "concurrency": 1,
         "input": {
           "middlewares": [],
-          "mode": "subscribe",
           "null": null
         },
         "output": {
           "middlewares": [],
-          "mode": "consume",
           "null": null
         }
       }
@@ -114,13 +124,13 @@ async function render() {
       
       try {
         // Try as expression (wrapped in parens to ensure it's an expression, not a block, and to fail on multiple statements)
-        const fn = new Function('h', 'renderObject', 'renderProperties', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', `return (${code});`);
-        config = fn(h, renderObject, renderProperties, domRenderer, setI18n, setConfig, setCustomRenderers);
+        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', `return (${code});`);
+        config = fn(h, renderObject, renderProperties, renderNode, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
         console.log("js 1 found");
       } catch (e) {
         // code += "\nif (typeof CUSTOM_RENDERERS !== 'undefined') { setCustomRenderers(CUSTOM_RENDERERS); }";
-        const fn = new Function('h', 'renderObject', 'renderProperties', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', code);
-        config = fn(h, renderObject, renderProperties, domRenderer, setI18n, setConfig, setCustomRenderers);
+        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', code);
+        config = fn(h, renderObject, renderProperties, renderNode, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
         console.log("js 2 found");
       }
       console.log(config);

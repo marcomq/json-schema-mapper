@@ -43,17 +43,17 @@ test.describe('Schema Form Mechanics', () => {
     await expect(inputSelector).toBeVisible();
 
     // 2. Select "memory" (Value 4 based on your HTML)
-    await inputSelector.selectOption({ label: 'memory' });
+    await inputSelector.selectOption({ label: 'Memory' });
 
     // 3. Verify "Topic" field appears (specific to Memory)
     const topicInput = page.getByLabel('Topic', { exact: false }); // "Topic *"
     await expect(topicInput).toBeVisible();
 
     // 4. Switch to "file" (Value 2)
-    await inputSelector.selectOption({ label: 'file' });
+    await inputSelector.selectOption({ label: 'File' });
 
     // 5. Verify "File" field appears and "Topic" is gone
-    await expect(page.getByLabel('File', { exact: false })).toBeVisible();
+    await expect(page.getByLabel('Path', { exact: false })).toBeVisible();
     await expect(topicInput).not.toBeVisible();
   });
 
@@ -91,7 +91,7 @@ test.describe('Schema Form Mechanics', () => {
 
     // 2. Configure Input -> Memory
     const inputSelector = page.locator('select[id$=".input__selector"]');
-    await inputSelector.selectOption({ label: 'memory' });
+    await inputSelector.selectOption({ label: 'Memory' });
 
     // 3. Fill the Topic
     const topicInput = page.getByLabel('Topic', { exact: false });

@@ -105,8 +105,9 @@ export const domRenderer: TemplateRenderer<Node> = {
       type: 'text',
       className: rendererConfig.classes.input,
       id: elementId,
-      value: node.defaultValue || ''
     };
+
+    if (node.defaultValue !== undefined) attrs.value = node.defaultValue;
 
     if (node.required) attrs.required = true;
     if (node.pattern) attrs.pattern = node.pattern;
@@ -149,8 +150,11 @@ export const domRenderer: TemplateRenderer<Node> = {
       type: 'number',
       className: rendererConfig.classes.input,
       id: elementId,
-      value: node.defaultValue !== undefined ? node.defaultValue : ''
     };
+
+    if (node.defaultValue !== undefined) {
+      attrs.value = node.defaultValue;
+    }
 
     if (node.required) attrs.required = true;
     if (node.minimum !== undefined) attrs.min = node.minimum;
@@ -214,7 +218,22 @@ export const domRenderer: TemplateRenderer<Node> = {
     return domRenderer.renderFieldWrapper(node, elementId, selectEl);
   },
   renderObject: (node: FormNode, elementId: string, content: Node): Node => {
-    return domRenderer.renderFieldsetWrapper(node, elementId, content, rendererConfig.classes.objectWrapper);
+    if (node.oneOf && node.oneOf.length > 0) {
+      return domRenderer.renderFieldsetWrapper(node, elementId, content, rendererConfig.classes.objectWrapper);
+    }
+
+    const children: Node[] = [];
+    if (node.title) {
+      children.push(h('h6', { className: 'fw-bold' }, node.title));
+    }
+    if (node.description) {
+      children.push(h('div', { className: rendererConfig.classes.description }, node.description));
+    }
+    children.push(content);
+    // Add placeholder for object-level errors
+    children.push(h('div', { 'data-validation-for': elementId }));
+
+    return h('div', { className: `${rendererConfig.classes.objectWrapper}`, id: elementId, 'data-element-id': elementId }, ...children);
   },
   renderAdditionalProperties: (node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): Node => {
     if (!node.additionalProperties) return document.createTextNode('');

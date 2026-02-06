@@ -120,6 +120,7 @@ export function renderNode(context: RenderContext, node: FormNode, path: string,
 }
 
 export function renderObject(context: RenderContext, node: FormNode, _path: string, elementId: string, headless: boolean, dataPath: string, options?: { additionalProperties?: { title?: string | null, keyPattern?: string } }): Node {
+  const oneOf = domRenderer.renderOneOf(node, elementId);
   const props = node.properties ? renderProperties(context, node.properties, elementId, dataPath) : domRenderer.renderFragment([]);
   const ap = domRenderer.renderAdditionalProperties(node, elementId, options?.additionalProperties);
   
@@ -141,7 +142,10 @@ export function renderObject(context: RenderContext, node: FormNode, _path: stri
         const apId = `${elementId}.__ap_${apIndex}`;
         const apDataPath = `${dataPath}/__ap_${apIndex}`;
 
-        const valueNodeRendered = renderNode(context, valueNode, apId, false, apDataPath);
+        // Render headless to avoid double borders (AP row already has border/container)
+        const valueNodeRendered = renderNode(context, valueNode, apId, true, apDataPath);
+        // Manually register data path because renderNode skips it for headless nodes
+        context.dataPathRegistry.set(apDataPath, apId);
         
         const uniqueId = `${apId}_key`;
         const renderer = findCustomRenderer(context, elementId);
@@ -156,9 +160,7 @@ export function renderObject(context: RenderContext, node: FormNode, _path: stri
     }
   }
 
-  const oneOf = domRenderer.renderOneOf(node, elementId);
-  
-  const content = domRenderer.renderFragment([props, ap, oneOf]);
+  const content = domRenderer.renderFragment([oneOf, props, ap]);
 
   if (headless) {
     return domRenderer.renderHeadlessObject(elementId, content);
@@ -184,6 +186,14 @@ export function renderProperties(context: RenderContext, properties: { [key: str
   const keys = remainingKeys.sort((a, b) => {
     const nodeA = properties[a];
     const nodeB = properties[b];
+
+    // 0. Render last
+    const renderLast = context.config.sorting.defaultRenderLast || [];
+    const isALast = renderLast.includes(a.toLowerCase());
+    const isBLast = renderLast.includes(b.toLowerCase());
+    if (isALast !== isBLast) {
+      return isALast ? 1 : -1;
+    }
     
     // 1. Priority fields (e.g. name, id, enabled)
     const priority = context.config.sorting.perObjectPriority[parentId] || context.config.sorting.defaultPriority;

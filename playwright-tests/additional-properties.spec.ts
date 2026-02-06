@@ -44,11 +44,12 @@ test.describe('Additional Properties & Path Resolution', () => {
     // It is inside the AP row. We select "static" option.
     // Note: The label for the oneOf wrapper is "Type / Variant".
     const selector = apRow.locator('select.js_oneof-selector').first();
-    await selector.selectOption({ label: 'static' });
+    await selector.selectOption({ label: 'Static' });
 
     // 3. Fill the static value
     // The property name is "static", so title is "Static".
-    const staticInput = apRow.getByLabel('Static');
+    // We target the input inside the oneOf container directly to avoid ambiguity.
+    const staticInput = apRow.getByLabel('Static', { exact: false });
     await expect(staticInput).toBeVisible();
     await staticInput.fill('some-value');
 

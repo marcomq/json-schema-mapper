@@ -5,7 +5,9 @@ import { FormNode } from "./parser";
  * This replaces the need to scrape the DOM for initial data.
  */
 export function generateDefaultData(node: FormNode): any {
-  if (node.defaultValue !== undefined) return node.defaultValue;
+  if (node.defaultValue !== undefined) {
+    return node.defaultValue;
+  }
 
   if (node.type === 'object') {
     const obj: any = {};
@@ -13,10 +15,19 @@ export function generateDefaultData(node: FormNode): any {
     if (node.properties) {
       for (const key in node.properties) {
         const prop = node.properties[key];
-        // Include if required, has default, or is a complex type (object/array/oneOf) that might contain defaults
-        const isComplex = prop.type === 'object' || prop.type === 'array' || (prop.oneOf && prop.oneOf.length > 0);
-        if (prop.required || prop.defaultValue !== undefined || isComplex) {
-           obj[key] = generateDefaultData(prop);
+        
+        // Only include properties that are required, have a default value,
+        // or are complex types (objects/arrays) which should be initialized.
+        const shouldInclude = prop.required || 
+                              prop.defaultValue !== undefined || 
+                              prop.type === 'object' || 
+                              prop.type === 'array';
+
+        if (shouldInclude) {
+          const value = generateDefaultData(prop);
+          if (value !== undefined) {
+            obj[key] = value;
+          }
         }
       }
     }
@@ -40,6 +51,7 @@ export function generateDefaultData(node: FormNode): any {
       }
     }
     
+    // For objects, always return an object, even if empty. This is crucial for array items.
     return obj;
   }
 

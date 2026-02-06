@@ -60,7 +60,12 @@ export class Store<T> {
 
     // Use structuredClone for a deep copy to ensure immutability of the previous state
     // and to trigger reactivity in systems that rely on reference equality.
-    const newState = structuredClone(this.state);
+    let newState = structuredClone(this.state);
+
+    if (newState === undefined || newState === null) {
+      newState = (typeof path[0] === 'number' ? [] : {}) as any;
+    }
+
     let current: any = newState;
 
     for (let i = 0; i < path.length - 1; i++) {
@@ -87,6 +92,8 @@ export class Store<T> {
     if (path.length === 0) return;
 
     const newState = structuredClone(this.state);
+    if (newState === undefined || newState === null) return;
+
     let current: any = newState;
 
     for (let i = 0; i < path.length - 1; i++) {

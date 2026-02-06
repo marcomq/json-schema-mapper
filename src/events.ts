@@ -104,12 +104,10 @@ function handleApKeyRename(context: RenderContext, target: HTMLInputElement) {
 function handleValueUpdate(context: RenderContext, target: HTMLInputElement | HTMLSelectElement): void {
   const path = resolvePath(target.id);
   if (!path) return;
-
-  const node = context.nodeRegistry.get(target.id);
-
-  // If a required field is cleared, remove it from the data to trigger AJV's `required` validation.
-  // This aligns with the user expectation that a required field cannot be empty.
-  if (target.value === '' && node?.required) {
+  // If a field is cleared, remove it from the data model.
+  // - For required fields, this will trigger AJV's `required` validation.
+  // - For optional fields, this ensures they are omitted from the output.
+  if (target.value === '') {
     context.store.removePath(path);
     return;
   }
@@ -119,8 +117,8 @@ function handleValueUpdate(context: RenderContext, target: HTMLInputElement | HT
     value = (target as HTMLInputElement).checked;
   } else if (target.type === 'number') {
     value = (target as HTMLInputElement).valueAsNumber;
-    // An empty (but not required) number input results in NaN. Store as null
-    // to trigger a type error from AJV if the schema doesn't allow nulls.
+    // An empty number input is handled above. A non-numeric string in a number
+    // input also results in NaN. We set it to null to trigger a type error.
     if (isNaN(value)) {
       value = null;
     }
@@ -280,8 +278,11 @@ function handleApAddItem(context: RenderContext, target: HTMLElement) {
     const valueSchema = typeof node.additionalProperties === 'object' ? node.additionalProperties : { type: 'string', title: 'Value' } as FormNode;
     const valueNode = { ...valueSchema, title: 'Value', key: undefined };
     // APs are tricky for data path mapping because key is dynamic. 
-    // We use a placeholder or skip validation mapping for now.
-    const valueNodeRendered = renderNode(context, valueNode, `${elementId}.__ap_${index}`, false, `${context.elementIdToDataPath.get(elementId!) || ""}/__ap_${index}`);
+    
+    const apId = `${elementId}.__ap_${index}`;
+    const apDataPath = `${context.elementIdToDataPath.get(elementId!) || ""}/__ap_${index}`;
+    const valueNodeRendered = renderNode(context, valueNode, apId, true, apDataPath);
+    context.dataPathRegistry.set(apDataPath, apId);
     
     let defaultKey = "";
     const renderer = findCustomRenderer(context, elementId || "");

@@ -142,12 +142,16 @@ export function transformSchemaToFormNode(
   // Determine the key to use for I18N lookup.
   // If we are at the root (title is empty), use the schema title if available.
   const titleFromKey = key ? formatTitle(key) : "";
-  const i18nKey = schemaObj.title || titleFromKey || "";
+  
+  // Use schema title if present (even if empty string), otherwise fallback to key
+  const explicitTitle = schemaObj.title;
+  const resolvedTitle = explicitTitle !== undefined ? explicitTitle : titleFromKey;
+  const i18nKey = resolvedTitle || "";
 
   const node: FormNode = {
     key: key || undefined,
     type: type as string,
-    title: getKeyText(i18nKey, schemaObj.title || titleFromKey),
+    title: getKeyText(i18nKey, resolvedTitle),
     description: getDescriptionText(key, schemaObj.description || undefined),
     defaultValue: schemaObj.default,
     enum: schemaObj.enum as any[],
@@ -165,10 +169,15 @@ export function transformSchemaToFormNode(
   const selection = schemaObj.oneOf || schemaObj.anyOf;
   if (selection) {
     node.oneOf = selection.map((sub: JSONSchema, idx: number) => {
-      const mergedSub = mergeAllOf(sub);
+      let mergedSub = mergeAllOf(sub);
+      const subTitleKey = inferTitle(mergedSub, idx); // e.g., "aws"
+      const subTitle = formatTitle(subTitleKey); // e.g., "Aws"
+
       // Pass empty string for key as oneOf options don't have a property key
       const subNode = transformSchemaToFormNode(mergedSub, "", depth + 1, isRequired);
-      subNode.title = inferTitle(mergedSub, idx);
+      if (!subNode.title || subNode.title.startsWith('Option ')) {
+        subNode.title = subTitle;
+      }
       return subNode;
     });
   }
@@ -180,6 +189,16 @@ export function transformSchemaToFormNode(
       for (const key in schemaObj.properties) {
         const propSchema = schemaObj.properties[key] as JSONSchema;
         const isPropRequired = schemaObj.required?.includes(key) || false;
+        
+        // If the property key is the same as the parent's title (case-insensitive),
+        // it's likely a wrapper for a oneOf variant. Don't give it a title.
+        if (node.title && key.toLowerCase() === node.title.toLowerCase()) {
+          const ps = propSchema as any;
+          // Only clear title for complex types (objects/arrays) to avoid removing labels from primitives
+          if (ps.type === 'object' || ps.type === 'array' || ps.properties || ps.items || ps.oneOf || ps.anyOf) {
+            ps.title = "";
+          }
+        }
         node.properties[key] = transformSchemaToFormNode(propSchema, key, depth + 1, isPropRequired);
       }
     }

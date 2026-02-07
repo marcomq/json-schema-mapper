@@ -187,7 +187,7 @@ describe('Integration Tests', () => {
     addButton.click();
 
     // Verify HTML
-    const nameInput = document.getElementById('root.users.0.__var_Item1.name') as HTMLInputElement;
+    const nameInput = document.getElementById('root.users.0.name') as HTMLInputElement;
     expect(nameInput).not.toBeNull();
 
     // Verify JSON (Store should update on click via renderer event listener)

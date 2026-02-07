@@ -8,6 +8,7 @@ import {
   setCustomRenderers,
   generateDefaultData,
   renderNode,
+  resolvePath,
 } from "../src/index";
 
 // Apply global I18N overrides
@@ -65,48 +66,54 @@ setConfig({
 });
 
 // Override renderFieldWrapper for compact layout
-const originalRenderFieldWrapper = domRenderer.renderFieldWrapper;
-domRenderer.renderFieldWrapper = (
-  node,
-  elementId,
-  inputElement,
-  wrapperClass,
-) => {
-  // Apply compact style only for simple types
-  if (
-    ["string", "number", "integer", "boolean"].includes(node.type) ||
-    node.enum
-  ) {
-    const label = node.title
-      ? h(
-          "label",
-          { className: "col-sm-3 col-form-label small", for: elementId },
-          node.title,
-          node.required ? h("span", { className: "text-danger" }, "*") : "",
-        )
-      : null;
-    const desc = node.description
-      ? h("span", { className: "form-text" }, node.description)
-      : null;
-    const errorPlaceholder = h("div", { "data-validation-for": elementId });
-
-    return h(
-      "div",
-      { className: "row mb-2", "data-element-id": elementId },
-      label,
-      h("div", { className: "col-sm-9" }, inputElement,
-        h("div", { className: "small text-muted" }, desc || "")
-       ),
-      h("div", { className: "col-12" }, errorPlaceholder),
-    );
-  }
-  return originalRenderFieldWrapper(
+if (!domRenderer.renderFieldWrapper.isCompact) {
+  const originalRenderFieldWrapper = domRenderer.renderFieldWrapper;
+  domRenderer.renderFieldWrapper = (
     node,
     elementId,
     inputElement,
     wrapperClass,
-  );
-};
+  ) => {
+    // Apply compact style only for simple types
+    if (
+      ["string", "number", "integer", "boolean"].includes(node.type) ||
+      node.enum
+    ) {
+      const label = node.title
+        ? h(
+            "label",
+            { className: "col-sm-3 col-form-label small", for: elementId },
+            node.title,
+            node.required ? h("span", { className: "text-danger" }, "*") : "",
+          )
+        : null;
+      const desc = node.description
+        ? h("span", { className: "form-text" }, node.description)
+        : null;
+      const errorPlaceholder = h("div", { "data-validation-for": elementId });
+
+      return h(
+        "div",
+        { className: "row mb-2", "data-element-id": elementId },
+        label,
+        h(
+          "div",
+          { className: "col-sm-9" },
+          inputElement,
+          h("div", { className: "small text-muted" }, desc || ""),
+        ),
+        h("div", { className: "col-12" }, errorPlaceholder),
+      );
+    }
+    return originalRenderFieldWrapper(
+      node,
+      elementId,
+      inputElement,
+      wrapperClass,
+    );
+  };
+  domRenderer.renderFieldWrapper.isCompact = true;
+}
 
 /**
  * Custom renderer for TLS configuration.
@@ -162,7 +169,7 @@ export const tlsRenderer = {
 export const routesRenderer = {
   render: (node, path, elementId, dataPath, context) => {
     return renderObject(context, node, path, elementId, false, dataPath, {
-      additionalProperties: { title: null }
+      additionalProperties: { title: null },
     });
   },
   getDefaultKey: (index) => `Route ${index + 1}`,
@@ -211,34 +218,18 @@ export const routesRenderer = {
   },
 };
 
-// Helper to merge data into schema node
-const mergeData = (schema, data) => {
-  if (data === undefined) return schema;
-  const newSchema = { ...schema };
-  if (newSchema.type === 'object' && typeof data === 'object' && data !== null) {
-    newSchema.defaultValue = data;
-    if (newSchema.properties) {
-      newSchema.properties = { ...newSchema.properties };
-      for (const key in newSchema.properties) {
-        newSchema.properties[key] = mergeData(newSchema.properties[key], data[key]);
-      }
-    }
-  } else {
-    newSchema.defaultValue = data;
-  }
-  return newSchema;
-};
-
-
 // Advanced Options Renderer (Collapse)
 const advancedOptionsRenderer = {
   render: (node, path, elementId, dataPath, context) => {
     // Fallback for primitives (e.g. "static" endpoint which is a string, not an object)
-    if (node.type !== 'object') {
-      if (node.type === 'string') return domRenderer.renderString(node, elementId);
-      if (node.type === 'boolean') return domRenderer.renderBoolean(node, elementId);
-      if (node.type === 'number' || node.type === 'integer') {
-        const safeNode = node.defaultValue === null ? { ...node, defaultValue: "" } : node;
+    if (node.type !== "object") {
+      if (node.type === "string")
+        return domRenderer.renderString(node, elementId);
+      if (node.type === "boolean")
+        return domRenderer.renderBoolean(node, elementId);
+      if (node.type === "number" || node.type === "integer") {
+        const safeNode =
+          node.defaultValue === null ? { ...node, defaultValue: "" } : node;
         return domRenderer.renderNumber(safeNode, elementId);
       }
       return domRenderer.renderUnsupported(node);
@@ -301,9 +292,7 @@ const advancedOptionsRenderer = {
             if (el) {
               const isHidden = el.style.display === "none";
               el.style.display = isHidden ? "block" : "none";
-              e.target.textContent = isHidden
-                ? "Hide"
-                : "Show more...";
+              e.target.textContent = isHidden ? "Hide" : "Show more...";
             }
           },
         },
@@ -326,11 +315,199 @@ const advancedOptionsRenderer = {
 };
 
 /**
+ * Custom renderer for Middlewares array.
+ * Replaces the standard "Add Item" button with an "Add Middleware" button that opens a select.
+ */
+const middlewaresRenderer = {
+  render: (node, path, elementId, dataPath, context) => {
+    const itemsContainerId = `${elementId}-items`;
+    const itemsContainer = h("div", {
+      className: "array-items",
+      id: itemsContainerId,
+    });
+
+    // Helper to render a single item
+    const renderItem = (itemData, index) => {
+      let selectedOption = node.items.oneOf[0];
+      let selectedIndex = 0;
+
+      if (itemData && typeof itemData === "object") {
+        const dataKeys = Object.keys(itemData);
+        node.items.oneOf.forEach((opt, idx) => {
+          if (opt.properties) {
+            const propKeys = Object.keys(opt.properties);
+            if (propKeys.length === 1 && dataKeys.includes(propKeys[0])) {
+              selectedOption = opt;
+              selectedIndex = idx;
+            }
+          }
+        });
+      }
+
+      let itemNodeToRender = selectedOption;
+      let itemPath = `${path}.${index}`;
+      let itemDataPath = `${dataPath}/${index}`;
+
+      // Unwrap single-property objects to reduce nesting
+      if (
+        selectedOption.properties &&
+        Object.keys(selectedOption.properties).length === 1
+      ) {
+        const propName = Object.keys(selectedOption.properties)[0];
+        itemNodeToRender = selectedOption.properties[propName];
+        itemPath = `${itemPath}.${propName}`;
+        itemDataPath = `${itemDataPath}/${propName}`;
+
+        if (!itemNodeToRender.title) {
+          itemNodeToRender = {
+            ...itemNodeToRender,
+            title:
+              selectedOption.title ||
+              propName.charAt(0).toUpperCase() + propName.slice(1),
+          };
+        }
+      } else {
+        itemNodeToRender = {
+          ...selectedOption,
+          title: selectedOption.title || `Middleware ${index + 1}`,
+        };
+      }
+
+      const itemEl = renderNode(
+        context,
+        itemNodeToRender,
+        itemPath,
+        false,
+        itemDataPath,
+      );
+      return domRenderer.renderArrayItem(itemEl);
+    };
+
+    // Render existing items
+    if (Array.isArray(node.defaultValue)) {
+      node.defaultValue.forEach((itemData, index) => {
+        itemsContainer.appendChild(renderItem(itemData, index));
+      });
+    }
+
+    // Check if parent is "null" type (Endpoint type is null)
+    const parentPathParts = dataPath.split("/").filter((p) => p);
+    parentPathParts.pop(); // remove 'middlewares'
+    const parentData = context.store.getPath(parentPathParts);
+    const isNullType =
+      parentData && typeof parentData === "object" && "null" in parentData;
+
+    if (isNullType) {
+      return h(
+        "fieldset",
+        { className: "border p-3 rounded mb-3 ui_arr", id: elementId },
+        h("legend", { className: "h6" }, node.title),
+        node.description
+          ? h("div", { className: "form-text mb-3" }, node.description)
+          : null,
+        itemsContainer,
+      );
+    }
+
+    const addBtn = h(
+      "button",
+      {
+        type: "button",
+        className: "btn btn-sm btn-outline-primary mt-2",
+        onclick: (e) => {
+          e.target.style.display = "none";
+          const select = e.target.nextElementSibling;
+          select.style.display = "inline-block";
+          select.focus();
+          if (select.showPicker) select.showPicker();
+        },
+      },
+      "Add Middleware",
+    );
+
+    const options = node.items.oneOf
+      .map((option, index) => {
+        if (
+          option.type === "null" ||
+          (option.title && option.title.toLowerCase() === "null")
+        )
+          return null;
+        return h(
+          "option",
+          { value: index },
+          option.title || `Option ${index + 1}`,
+        );
+      })
+      .filter((o) => o !== null);
+    options.unshift(
+      h(
+        "option",
+        { value: "", selected: true, disabled: true },
+        "Select type...",
+      ),
+    );
+
+    const select = h(
+      "select",
+      {
+        className: "form-select form-select-sm mt-2",
+        style: "display: none; width: auto;",
+        onchange: (e) => {
+          const selectedIndex = parseInt(e.target.value, 10);
+          if (isNaN(selectedIndex)) return;
+          e.target.value = "";
+          e.target.style.display = "none";
+          addBtn.style.display = "inline-block";
+
+          const currentPath = resolvePath(elementId);
+          if (!currentPath) return;
+
+          if (
+            currentPath[currentPath.length - 1] !== "middlewares" &&
+            (node.key === "middlewares" || elementId.endsWith(".middlewares"))
+          ) {
+            currentPath.push("middlewares");
+          }
+
+          const currentData = context.store.getPath(currentPath) || [];
+          const newItemIndex = currentData.length;
+          const selectedOption = node.items.oneOf[selectedIndex];
+          const newData = generateDefaultData(selectedOption);
+          context.store.setPath([...currentPath, newItemIndex], newData);
+
+          const wrapper = renderItem(newData, newItemIndex);
+          itemsContainer.appendChild(wrapper);
+        },
+        onblur: (e) => {
+          e.target.value = "";
+          e.target.style.display = "none";
+          addBtn.style.display = "inline-block";
+        },
+      },
+      ...options,
+    );
+
+    return h(
+      "fieldset",
+      { className: "border p-3 rounded mb-3 ui_arr", id: elementId },
+      h("legend", { className: "h6" }, node.title),
+      node.description
+        ? h("div", { className: "form-text mb-3" }, node.description)
+        : null,
+      itemsContainer,
+      addBtn,
+      select,
+    );
+  },
+};
+
+/**
  * Registry of custom renderers.
  */
 export const CUSTOM_RENDERERS = {
   tls: tlsRenderer,
   routes: routesRenderer,
+  middlewares: middlewaresRenderer,
   "output.mode": { render: () => document.createDocumentFragment() },
   value: {
     render: (node, path, elementId, dataPath, context) => {

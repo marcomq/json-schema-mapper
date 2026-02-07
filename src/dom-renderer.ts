@@ -298,36 +298,46 @@ export const domRenderer: TemplateRenderer<Node> = {
     const wrapperNode = { ...node, title: getUiText("type_variant", "Type / Variant"), description: undefined, required: false, _inputId: `${elementId}__selector` };
     return domRenderer.renderFieldWrapper(wrapperNode, elementId, selectContainer, rendererConfig.classes.oneOfWrapper);
   },
-  renderArray: (node: FormNode, elementId: string): Node => {
+  renderArray: (node: FormNode, elementId: string, options?: { isFixedSize?: boolean }): Node => {
     const itemsContainer = h('div', {
       className: `${rendererConfig.classes.arrayItems} ${rendererConfig.triggers.arrayItems}`,
       id: `${elementId}-items`
     });
 
-    const addButton = h('button', {
-      className: `${rendererConfig.classes.buttonPrimary} ${rendererConfig.triggers.addArrayItem}`,
-      type: 'button',
-      'data-id': elementId,
-      'data-target': `${elementId}-items`
-    }, getUiText("add_item", "Add Item"));
+    const children = [itemsContainer];
 
-    const content = h(rendererConfig.elements.array, { 'data-element-id': elementId }, itemsContainer, addButton);
+    if (!options?.isFixedSize) {
+      const addButton = h('button', {
+        className: `${rendererConfig.classes.buttonPrimary} ${rendererConfig.triggers.addArrayItem}`,
+        type: 'button',
+        'data-id': elementId,
+        'data-target': `${elementId}-items`
+      }, getUiText("add_item", "Add Item"));
+      children.push(addButton);
+    }
+
+    const content = h(rendererConfig.elements.array, { 'data-element-id': elementId }, ...children);
     return domRenderer.renderFieldsetWrapper(node, elementId, content, rendererConfig.classes.arrayWrapper);
   },
-  renderArrayItem: (item: Node): Node => {
+  renderArrayItem: (item: Node, options?: { isRemovable?: boolean }): Node => {
+    const isRemovable = options?.isRemovable !== false;
     const contentWrapper = h('div', {
       className: `${rendererConfig.classes.arrayItemContent} ${rendererConfig.triggers.arrayItemContent}`
     }, item);
 
-    const removeButton = h('button', {
-      className: `${rendererConfig.classes.buttonDanger} ${rendererConfig.triggers.removeArrayItem}`,
-      type: 'button',
-      style: 'margin-top: 2rem;'
-    }, getUiText("remove", "Remove"));
+    const children = [contentWrapper];
+
+    if (isRemovable) {
+      const removeButton = h('button', {
+        className: `${rendererConfig.classes.buttonDanger} ${rendererConfig.triggers.removeArrayItem}`,
+        type: 'button',
+      }, getUiText("remove", "Remove"));
+      children.push(removeButton);
+    }
 
     return h(rendererConfig.elements.arrayItem, {
       className: `${rendererConfig.classes.arrayItemRow} ${rendererConfig.triggers.arrayItemRow}`
-    }, contentWrapper, removeButton);
+    }, ...children);
   },
   renderAdditionalPropertyRow: (value: Node, defaultKey: string = "", uniqueId: string = ""): Node => {
     const keyLabel = h('label', { className: rendererConfig.classes.labelSmall, for: uniqueId }, 'Key');

@@ -1,6 +1,6 @@
 import { RenderContext, ErrorObject } from "./types";
 import { FormNode } from "./parser";
-import { renderNode, findCustomRenderer } from "./renderer";
+import { renderNode, findCustomRenderer, hydrateNodeWithData } from "./renderer";
 import { generateDefaultData } from "./form-data-reader";
 import { validateData } from "./validator";
 import { domRenderer } from "./dom-renderer";
@@ -207,36 +207,52 @@ function handleArrayAddItem(context: RenderContext, target: HTMLElement) {
   const targetContainerId = target.getAttribute('data-target');
   const node = context.nodeRegistry.get(elementId!);
   
-  if (node && node.items) {
+  if (node) {
     const container = document.getElementById(targetContainerId!);
-    const index = container!.children.length;
-    const itemTitle = `Item ${index + 1}`;
-    const itemNode = { ...node.items, title: itemTitle };
-    const parentDataPath = context.elementIdToDataPath.get(elementId!) || "";
-    const itemDataPath = `${parentDataPath}/${index}`;
-    const innerNode = renderNode(context, itemNode, `${elementId}.${index}`, false, itemDataPath);
-    const itemNodeWrapper = domRenderer.renderArrayItem(innerNode);
-    container!.appendChild(itemNodeWrapper);
+    if (!container) return;
+    
+    const index = container.children.length;
+    let itemSchema: FormNode | undefined;
 
-    // Update Store: Add default value
-    const path = resolvePath(elementId!);
-    if (path) {
-      // The new item is at the index we just calculated
-      const itemPath = [...path, index];
-      const defaultValue = generateDefaultData(node.items);
-      context.store.setPath(itemPath, defaultValue);
+    if (node.prefixItems && index < node.prefixItems.length) {
+      itemSchema = node.prefixItems[index];
+    } else if (node.items) {
+      itemSchema = node.items;
     }
 
-    // Initialize OneOfs in the new item
-    const newItem = container!.lastElementChild;
-    if (newItem) {
-      newItem.querySelectorAll(`.${rendererConfig.triggers.oneOfSelector}`).forEach(el => {
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    }
+    if (itemSchema) {
+      const itemTitle = `Item ${index + 1}`;
+      let itemNode = { ...itemSchema, title: itemTitle };
+      
+      let defaultValue = generateDefaultData(itemSchema);
+      itemNode = hydrateNodeWithData(itemNode, defaultValue);
+      itemNode.key = String(index);
 
-    container?.dispatchEvent(new Event('change', { bubbles: true }));
-    validateAndShowErrors(context);
+      const parentDataPath = context.elementIdToDataPath.get(elementId!) || "";
+      const itemDataPath = `${parentDataPath}/${index}`;
+      const innerNode = renderNode(context, itemNode, elementId!, false, itemDataPath);
+      const itemNodeWrapper = domRenderer.renderArrayItem(innerNode, { isRemovable: true });
+      container.appendChild(itemNodeWrapper);
+
+      // Update Store: Add default value
+      const path = resolvePath(elementId!);
+      if (path) {
+        // The new item is at the index we just calculated
+        const itemPath = [...path, index];
+        context.store.setPath(itemPath, defaultValue);
+      }
+
+      // Initialize OneOfs in the new item
+      const newItem = container.lastElementChild;
+      if (newItem) {
+        newItem.querySelectorAll(`.${rendererConfig.triggers.oneOfSelector}`).forEach(el => {
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
+
+      container.dispatchEvent(new Event('change', { bubbles: true }));
+      validateAndShowErrors(context);
+    }
   }
 }
 
@@ -361,7 +377,7 @@ function handleApRemoveItem(context: RenderContext, target: HTMLElement, contain
   container.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function resolvePath(elementId: string): (string | number)[] | null {
+export function resolvePath(elementId: string): (string | number)[] | null {
   const fullParts = elementId.split('.');
   if (fullParts.length === 0) return [];
   
@@ -403,6 +419,29 @@ function updateArrayIndices(context: RenderContext, container: HTMLElement, star
     const newIndex = i;
     const oldPrefix = `${baseId}.${oldIndex}`;
     const newPrefix = `${baseId}.${newIndex}`;
+
+    // Update visible title (Item 1, Item 2, etc.)
+    const contentWrapper = row.querySelector(`.${rendererConfig.triggers.arrayItemContent}`);
+    if (contentWrapper && contentWrapper.firstElementChild) {
+      const itemRoot = contentWrapper.firstElementChild as HTMLElement;
+      
+      // 1. Check for Legend (Fieldset)
+      const legend = itemRoot.querySelector('legend');
+      if (legend && /^Item \d+$/.test(legend.textContent || '')) {
+        legend.textContent = `Item ${newIndex + 1}`;
+      }
+
+      // 2. Check for Label (FieldWrapper)
+      const label = itemRoot.querySelector('label');
+      if (label) {
+        for (const child of Array.from(label.childNodes)) {
+          if (child.nodeType === Node.TEXT_NODE && /^Item \d+$/.test(child.textContent?.trim() || '')) {
+            child.textContent = `Item ${newIndex + 1}`;
+            break;
+          }
+        }
+      }
+    }
 
     // Update IDs and attributes for the row and all its children
     const elements = [row, ...row.querySelectorAll('*')];

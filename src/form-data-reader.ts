@@ -56,6 +56,9 @@ export function generateDefaultData(node: FormNode): any {
   }
 
   if (node.type === 'array') {
+    if (node.prefixItems && node.prefixItems.length > 0) {
+      return node.prefixItems.map(item => generateDefaultData(item));
+    }
     return [];
   }
 

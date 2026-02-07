@@ -11,7 +11,8 @@ import {
   renderProperties,
   generateDefaultData,
   renderNode,
-  domRenderer 
+  domRenderer, 
+  resolvePath
 } from '../../src/index';
 import defaultSchema from '../schema.json';
 import defaultCustomization from '../customization.js?raw'; // ?raw supported by vite
@@ -87,11 +88,35 @@ const els = {
   selector: document.getElementById('example-selector') as HTMLSelectElement,
 };
 
+// --- State Management for Playground ---
+
+// Store the original renderer functions to reset monkey-patching
+const originalRenderFieldWrapper = domRenderer.renderFieldWrapper;
+
+// Keys from customization.js to reset custom renderers
+const customRendererKeys = [
+  "tls", "routes", "middlewares", "output.mode", "value",
+  "aws", "kafka", "nats", "file", "static", "memory", "amqp", 
+  "mongodb", "mqtt", "http", "ibmmq", "zeromq", "switch", 
+  "response", "custom"
+];
+const renderersToReset = Object.fromEntries(customRendererKeys.map(k => [k, undefined]));
+
+/**
+ * Resets all global library state that might be modified by a config script.
+ * This is crucial for the playground to prevent configs from leaking between examples.
+ */
+function resetAll() {
+  resetConfig();
+  resetI18n();
+  setCustomRenderers(renderersToReset); // Effectively clears the custom renderers
+  domRenderer.renderFieldWrapper = originalRenderFieldWrapper;
+}
+
 // --- Logic ---
 
 async function loadExample(key: string) {
   let ex = EXAMPLES[key];
-  
   els.schema.value = JSON.stringify(ex.schema, null, 2);
   els.config.value = typeof ex.config === 'string' ? ex.config : JSON.stringify(ex.config, null, 2);
   els.data.value = JSON.stringify(ex.data, null, 2);
@@ -101,8 +126,7 @@ async function loadExample(key: string) {
 
 async function render() {
   // 1. Reset Global State
-  resetConfig();
-  resetI18n();
+  resetAll();
 
   // 2. Parse Inputs
   let schema, config, initialData;
@@ -124,13 +148,13 @@ async function render() {
       
       try {
         // Try as expression (wrapped in parens to ensure it's an expression, not a block, and to fail on multiple statements)
-        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', `return (${code});`);
-        config = fn(h, renderObject, renderProperties, renderNode, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
+        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'resolvePath', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', `return (${code});`);
+        config = fn(h, renderObject, renderProperties, renderNode, resolvePath, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
         console.log("js 1 found");
       } catch (e) {
         // code += "\nif (typeof CUSTOM_RENDERERS !== 'undefined') { setCustomRenderers(CUSTOM_RENDERERS); }";
-        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', code);
-        config = fn(h, renderObject, renderProperties, renderNode, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
+        const fn = new Function('h', 'renderObject', 'renderProperties', 'renderNode', 'resolvePath', 'generateDefaultData', 'domRenderer', 'setI18n', 'setConfig', 'setCustomRenderers', code);
+        config = fn(h, renderObject, renderProperties, renderNode, resolvePath, generateDefaultData, domRenderer, setI18n, setConfig, setCustomRenderers);
         console.log("js 2 found");
       }
       console.log(config);

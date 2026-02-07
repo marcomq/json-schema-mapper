@@ -14,8 +14,8 @@ export interface TemplateRenderer<T> {
   renderObject(node: FormNode, elementId: string, content: T): T;
   renderAdditionalProperties(node: FormNode, elementId: string, options?: { title?: string | null, keyPattern?: string }): T;
   renderOneOf(node: FormNode, elementId: string): T;
-  renderArray(node: FormNode, elementId: string): T;
-  renderArrayItem(item: T): T;
+  renderArray(node: FormNode, elementId: string, options?: { isFixedSize?: boolean }): T;
+  renderArrayItem(item: T, options?: { isRemovable?: boolean }): T;
   renderAdditionalPropertyRow(value: T, defaultKey?: string, uniqueId?: string): T;
   renderLayoutGroup(title: string | undefined, content: T, className?: string): T;
   renderFormWrapper(content: T): T;

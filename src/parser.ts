@@ -16,6 +16,7 @@ export interface FormNode {
   defaultValue?: any;
   properties?: { [key: string]: FormNode }; // For objects
   items?: FormNode; // For arrays
+  prefixItems?: FormNode[];
   additionalProperties?: boolean | FormNode;
   oneOf?: FormNode[];
   enum?: any[];
@@ -217,10 +218,14 @@ export function transformSchemaToFormNode(
   }
 
   // Recurse for array items
-  if (schemaObj.type === "array" && schemaObj.items) {
+  if (node.type === "array") {
     // Assuming schema.items is a single schema object
-    if (typeof schemaObj.items === "object" && !Array.isArray(schemaObj.items)) {
+    if (schemaObj.items && typeof schemaObj.items === "object" && !Array.isArray(schemaObj.items)) {
       node.items = transformSchemaToFormNode(schemaObj.items as JSONSchema, "", depth + 1, false);
+    }
+    // Handle prefixItems (JSON Schema 2020-12)
+    if ((schemaObj as any).prefixItems && Array.isArray((schemaObj as any).prefixItems)) {
+      node.prefixItems = (schemaObj as any).prefixItems.map((item: any) => transformSchemaToFormNode(item, "", depth + 1, false));
     }
   }
 

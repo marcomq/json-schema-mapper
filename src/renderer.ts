@@ -100,16 +100,40 @@ export function renderNode(context: RenderContext, node: FormNode, path: string,
     case "boolean": return domRenderer.renderBoolean(node, elementId);
     case "object": return renderObject(context, node, path, elementId, headless, dataPath);
     case "array": {
-      const arrayWrapper = domRenderer.renderArray(node, elementId);
+      const isFixedSize = !!(node.prefixItems && node.prefixItems.length > 0 && !node.items);
+      const arrayWrapper = domRenderer.renderArray(node, elementId, { isFixedSize });
+      const itemsContainer = (arrayWrapper as Element).querySelector(`.${rendererConfig.triggers.arrayItems}`);
+
+      // Render prefixItems (Tuple)
+      if (node.prefixItems && node.prefixItems.length > 0 && itemsContainer) {
+        node.prefixItems.forEach((itemNode, index) => {
+          let itemData: any = undefined;
+          let hasData = false;
+          if (Array.isArray(node.defaultValue) && node.defaultValue.length > index) {
+            itemData = node.defaultValue[index];
+            hasData = true;
+          }
+          if (hasData) {
+            const hydratedItem = hydrateNodeWithData(itemNode, itemData);
+            // Don't force title for prefixItems to allow label-less rendering
+            hydratedItem.key = String(index);
+            const itemDataPath = `${dataPath}/${index}`;
+            const renderedItem = renderNode(context, hydratedItem, elementId, false, itemDataPath);
+            itemsContainer.appendChild(domRenderer.renderArrayItem(renderedItem, { isRemovable: false }));
+          }
+        });
+      }
       // Render existing items if data is present
-      if (Array.isArray(node.defaultValue) && node.items) {
-        node.defaultValue.forEach((itemData: any, index: number) => {
+      if (Array.isArray(node.defaultValue) && node.items && itemsContainer) {
+        const startIndex = node.prefixItems ? node.prefixItems.length : 0;
+        node.defaultValue.slice(startIndex).forEach((itemData: any, index: number) => {
+          const realIndex = startIndex + index;
           const itemNode = hydrateNodeWithData(node.items!, itemData);
-          itemNode.title = itemNode.title || `Item ${index + 1}`;
-          const itemPath = `${elementId}.${index}`;
-          const itemDataPath = `${dataPath}/${index}`;
-          const renderedItem = renderNode(context, itemNode, itemPath, false, itemDataPath);
-          arrayWrapper.appendChild(domRenderer.renderArrayItem(renderedItem));
+          itemNode.title = itemNode.title || `Item ${realIndex + 1}`;
+          itemNode.key = String(realIndex);
+          const itemDataPath = `${dataPath}/${realIndex}`;
+          const renderedItem = renderNode(context, itemNode, elementId, false, itemDataPath);
+          itemsContainer.appendChild(domRenderer.renderArrayItem(renderedItem, { isRemovable: true }));
         });
       }
       return arrayWrapper;
